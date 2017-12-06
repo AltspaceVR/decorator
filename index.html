@@ -8,7 +8,10 @@
 	</head>
 	<body>
 		<a-scene altspace='fullspace: true'>
-			<a-box></a-box>
+			<a-assets>
+				<a-mixin id='highrise-spot' position='22.4 0.7 -11'></a-mixin>
+			</a-assets>
+			<a-box place-for-space='templates: highrise-homespace; mixins: highrise-spot'></a-box>
 		</a-scene>
 	</body>
 </html>
