@@ -1,0 +1,5 @@
+node_modules/
+
+# stupid prepros-generated files that I can't disable
+prepros.cfg
+README.html
