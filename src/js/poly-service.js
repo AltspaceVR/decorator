@@ -7,7 +7,7 @@ AFRAME.registerSystem('poly-service', {
 	init: function(){
 		this.pages = [];
 		this.loader = new AFRAME.THREE.FileLoader();
-		this.query = `https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&key=${this.data.key}`;
+		this.query = `https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&pageSize=20&key=${this.data.key}`;
 	},
 	getListing: async function(page)
 	{

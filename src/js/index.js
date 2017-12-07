@@ -1,3 +1,4 @@
 import './place-for-space';
-import './list-library-items';
+import './library-page';
+import './library-item';
 import './poly-service';

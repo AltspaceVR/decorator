@@ -26,4 +26,14 @@ html
 				a-gltf-model(src='#pedestal_model' position='1 .05 -.3')
 				a-entity#spawn_point(position='1 .55 -.3')
 
-				a-entity#spawn_menu(position='-1 0 0' list-library-items='service: poly; page: 0')
+				a-entity#spawn_menu(position='-1 1 0' library-page='service: poly; page: 0')
+					- let size = .3, pad = .04
+					each i in [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+						a-box(library-item=`${i}`, visible=true,
+							width=size, height=size, depth=size/10,
+							position=`${(-2+i%5)*(size+pad)} ${(2-Math.floor(i/5))*(size+pad)} 0`)
+
+					a-box#prev(width=2.5*size+1.5*pad, height=size, depth=size/10,
+						position=`${-1.25*(size+pad)} ${-2*(size+pad)} 0`)
+					a-box#next(width=2.5*size+1.5*pad, height=size, depth=size/10,
+						position=`${1.25*(size+pad)} ${-2*(size+pad)} 0`)

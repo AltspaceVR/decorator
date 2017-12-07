@@ -2055,14 +2055,13 @@ AFRAME.registerComponent('place-for-space', {
 	}()
 });
 
-AFRAME.registerComponent('list-library-items', {
+AFRAME.registerComponent('library-page', {
 	schema: {
 		service: { type: 'string', default: 'poly' },
 		page: { type: 'int', default: 0 }
 	},
 	update: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(oldData) {
-			var payload;
 			return regenerator.wrap(function _callee$(_context) {
 				while (1) {
 					switch (_context.prev = _context.next) {
@@ -2071,9 +2070,9 @@ AFRAME.registerComponent('list-library-items', {
 							return this.el.sceneEl.systems[this.data.service + '-service'].fakeGetListing(this.data.page);
 
 						case 2:
-							payload = _context.sent;
+							this.currentPage = _context.sent;
 
-							console.log(payload);
+							this.el.emit('pageupdated');
 
 						case 4:
 						case 'end':
@@ -2091,6 +2090,14 @@ AFRAME.registerComponent('list-library-items', {
 	}()
 });
 
+AFRAME.registerComponent('library-item', {
+	schema: { type: 'int' },
+	init: function init() {
+		this.el.parentElement.addEventListener('pageupdated', this.updateContents.bind(this));
+	},
+	updateContents: function updateContents() {}
+});
+
 function loadFile(url) {
 	var loader = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new AFRAME.THREE.FileLoader();
 
@@ -2106,7 +2113,7 @@ AFRAME.registerSystem('poly-service', {
 	init: function init() {
 		this.pages = [];
 		this.loader = new AFRAME.THREE.FileLoader();
-		this.query = 'https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&key=' + this.data.key;
+		this.query = 'https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&pageSize=20&key=' + this.data.key;
 	},
 	getListing: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(page) {
