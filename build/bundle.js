@@ -1962,13 +1962,13 @@ _export(_export.S, 'Promise', { 'try': function (callbackfn) {
   return promiseCapability.promise;
 } });
 
-var promise$2 = _core.Promise;
+var promise$1 = _core.Promise;
 
 var promise = createCommonjsModule(function (module) {
-module.exports = { "default": promise$2, __esModule: true };
+module.exports = { "default": promise$1, __esModule: true };
 });
 
-unwrapExports(promise);
+var _Promise = unwrapExports(promise);
 
 var asyncToGenerator = createCommonjsModule(function (module, exports) {
 exports.__esModule = true;
@@ -2029,6 +2029,8 @@ AFRAME.registerComponent('place-for-space', {
 
 						case 2:
 							space = _context.sent;
+
+							console.log(space);
 							index = this.data.templates.indexOf(space.templateSid);
 
 							if (index >= 0) {
@@ -2037,7 +2039,7 @@ AFRAME.registerComponent('place-for-space', {
 								this.el.setAttribute('mixin', this.data.otherwise);
 							}
 
-						case 5:
+						case 6:
 						case 'end':
 							return _context.stop();
 					}
@@ -2050,6 +2052,176 @@ AFRAME.registerComponent('place-for-space', {
 		}
 
 		return init;
+	}()
+});
+
+AFRAME.registerComponent('list-library-items', {
+	schema: {
+		service: { type: 'string', default: 'poly' },
+		page: { type: 'int', default: 0 }
+	},
+	update: function () {
+		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(oldData) {
+			var payload;
+			return regenerator.wrap(function _callee$(_context) {
+				while (1) {
+					switch (_context.prev = _context.next) {
+						case 0:
+							_context.next = 2;
+							return this.el.sceneEl.systems[this.data.service + '-service'].fakeGetListing(this.data.page);
+
+						case 2:
+							payload = _context.sent;
+
+							console.log(payload);
+
+						case 4:
+						case 'end':
+							return _context.stop();
+					}
+				}
+			}, _callee, this);
+		}));
+
+		function update(_x) {
+			return _ref.apply(this, arguments);
+		}
+
+		return update;
+	}()
+});
+
+function loadFile(url) {
+	var loader = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new AFRAME.THREE.FileLoader();
+
+	return new _Promise(function (resolve, reject) {
+		loader.load(url, resolve, function () {}, reject);
+	});
+}
+
+AFRAME.registerSystem('poly-service', {
+	schema: {
+		key: { type: 'string' }
+	},
+	init: function init() {
+		this.pages = [];
+		this.loader = new AFRAME.THREE.FileLoader();
+		this.query = 'https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&key=' + this.data.key;
+	},
+	getListing: function () {
+		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(page) {
+			var data, json, _prevPage, _data, _json;
+
+			return regenerator.wrap(function _callee$(_context) {
+				while (1) {
+					switch (_context.prev = _context.next) {
+						case 0:
+							if (!(page < 0)) {
+								_context.next = 2;
+								break;
+							}
+
+							throw new Error('Requested page (' + page + ') before beginning');
+
+						case 2:
+							if (!this.pages[page]) {
+								_context.next = 6;
+								break;
+							}
+
+							return _context.abrupt('return', this.pages[page]);
+
+						case 6:
+							if (!(page === 0)) {
+								_context.next = 15;
+								break;
+							}
+
+							_context.next = 9;
+							return loadFile(this.query, this.loader);
+
+						case 9:
+							data = _context.sent;
+							json = JSON.parse(data);
+
+							this.pages.push(json);
+							return _context.abrupt('return', json);
+
+						case 15:
+							_context.prev = 15;
+							_context.next = 18;
+							return this.getOrFetchListing(page - 1);
+
+						case 18:
+							_prevPage = _context.sent;
+							_context.next = 24;
+							break;
+
+						case 21:
+							_context.prev = 21;
+							_context.t0 = _context['catch'](15);
+							throw new Error('Requested page (' + page + ') past end');
+
+						case 24:
+							if (!prevPage.nextPageToken) {
+								_context.next = 33;
+								break;
+							}
+
+							_context.next = 27;
+							return loadFile(this.query + '&pageToken=' + prevPage.nextPageToken, this.loader);
+
+						case 27:
+							_data = _context.sent;
+							_json = JSON.parse(_data);
+
+							this.pages.push(_json);
+							return _context.abrupt('return', _json);
+
+						case 33:
+							throw new Error('Requested page (' + page + ') past end');
+
+						case 34:
+						case 'end':
+							return _context.stop();
+					}
+				}
+			}, _callee, this, [[15, 21]]);
+		}));
+
+		function getListing(_x) {
+			return _ref.apply(this, arguments);
+		}
+
+		return getListing;
+	}(),
+	fakeGetListing: function () {
+		var _ref2 = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee2(page) {
+			var data;
+			return regenerator.wrap(function _callee2$(_context2) {
+				while (1) {
+					switch (_context2.prev = _context2.next) {
+						case 0:
+							_context2.next = 2;
+							return loadFile('testdata/listing.json', this.loader);
+
+						case 2:
+							data = _context2.sent;
+							return _context2.abrupt('return', JSON.parse(data));
+
+						case 4:
+						case 'end':
+							return _context2.stop();
+					}
+				}
+			}, _callee2, this);
+		}));
+
+		function fakeGetListing(_x2) {
+			return _ref2.apply(this, arguments);
+		}
+
+		return fakeGetListing;
 	}()
 });
 

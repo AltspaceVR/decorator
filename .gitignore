@@ -1,4 +1,6 @@
 node_modules/
+*.blend1
+*.blend2
 
 # stupid prepros-generated files that I can't disable
 prepros.cfg

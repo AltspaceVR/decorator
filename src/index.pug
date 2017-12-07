@@ -1,0 +1,29 @@
+doctype html
+html
+	head
+		title Homespace Decorator - AltspaceVR
+		if production
+			script(src='https://aframe.io/releases/0.7.0/aframe.min.js')
+			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.min.js')
+			script(src='build/bundle.min.js')
+		else
+			script(src='https://aframe.io/releases/0.7.0/aframe.js')
+			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.js')
+			script(src='build/bundle.js')
+
+	body
+		a-scene(debug, altspace='fullspace: true',
+			poly-service='key: AIzaSyCYv7u5gLyRbo0amrki3732pbeqsHppIbo')
+
+			a-assets
+				a-asset-item#pedestal_model(src='build/pedestal.gltf')
+				a-mixin#highrise_spot(position='22.4 0.7 -11')
+
+			a-entity#spawn-complex(place-for-space='templates: highrise_homespace; mixins: highrise_spot')
+
+				a-sphere(radius='.005')
+
+				a-gltf-model(src='#pedestal_model' position='1 .05 -.3')
+				a-entity#spawn_point(position='1 .55 -.3')
+
+				a-entity#spawn_menu(position='-1 0 0' list-library-items='service: poly; page: 0')

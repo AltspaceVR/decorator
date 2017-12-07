@@ -6,6 +6,7 @@ AFRAME.registerComponent('place-for-space', {
 	},
 	init: async function(){
 		let space = await altspace.getSpace();
+		console.log(space);
 		let index = this.data.templates.indexOf(space.templateSid);
 		if(index >= 0){
 			this.el.setAttribute('mixin', this.data.mixins[index]);

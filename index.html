@@ -1,17 +1,1 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<title>Homespace Decorator - AltspaceVR</title>
-		<script src="https://aframe.io/releases/0.7.0/aframe.min.js"></script>
-		<script src="https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.min.js"></script>
-		<script src='build/bundle.js'></script>
-	</head>
-	<body>
-		<a-scene altspace='fullspace: true'>
-			<a-assets>
-				<a-mixin id='highrise-spot' position='22.4 0.7 -11'></a-mixin>
-			</a-assets>
-			<a-box place-for-space='templates: highrise-homespace; mixins: highrise-spot'></a-box>
-		</a-scene>
-	</body>
-</html>
+<!DOCTYPE html><html><head><title>Homespace Decorator - AltspaceVR</title><script src="https://aframe.io/releases/0.7.0/aframe.js"></script><script src="https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.js"></script><script src="build/bundle.js"></script></head><body><a-scene debug altspace="fullspace: true" poly-service="key: AIzaSyCYv7u5gLyRbo0amrki3732pbeqsHppIbo"><a-assets><a-asset-item id="pedestal_model" src="build/pedestal.gltf"></a-asset-item><a-mixin id="highrise_spot" position="22.4 0.7 -11"></a-mixin></a-assets><a-entity id="spawn-complex" place-for-space="templates: highrise_homespace; mixins: highrise_spot"><a-sphere radius=".005"></a-sphere><a-gltf-model src="#pedestal_model" position="1 .05 -.3"></a-gltf-model><a-entity id="spawn_point" position="1 .55 -.3"></a-entity><a-entity id="spawn_menu" position="-1 0 0" list-library-items="service: poly; page: 0"></a-entity></a-entity></a-scene></body></html>
