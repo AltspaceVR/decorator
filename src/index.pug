@@ -34,6 +34,10 @@ html
 							position=`${(-2+i%5)*(size+pad)} ${(2-Math.floor(i/5))*(size+pad)} 0`)
 
 					a-box#prev(width=2.5*size+1.5*pad, height=size, depth=size/10,
+						color='#808080'
 						position=`${-1.25*(size+pad)} ${-2*(size+pad)} 0`)
+						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Previous; font-size: 1')
 					a-box#next(width=2.5*size+1.5*pad, height=size, depth=size/10,
+						color='#808080'
 						position=`${1.25*(size+pad)} ${-2*(size+pad)} 0`)
+						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Next; font-size: 1')
