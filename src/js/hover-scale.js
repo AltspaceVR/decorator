@@ -19,8 +19,6 @@ AFRAME.registerComponent('hover-scale', {
 		{
 			let smallScale = obj2array(this.el.getAttribute('scale'), ['x','y','z']);
 			let bigScale = smallScale.map(x => x*scaleFactor);
-			console.log(smallScale, bigScale);
-
 			this.el.setAttribute('animation__hover', {from: smallScale.join(' '), to: bigScale.join(' ')});
 
 			this.el.emit('hoverstart');

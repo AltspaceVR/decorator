@@ -26,7 +26,8 @@ html
 				a-sphere(radius='.005')
 
 				a-gltf-model(src='#pedestal_model' position='1 .05 -.3')
-				a-entity#spawn_point(position='1 .55 -.3')
+				a-entity(position='1 .55 -.3')
+					a-gltf-model#spawn_point(maintain-size='1 1 1')
 
 				a-entity#spawn_menu(position='-1 1 0' library-page='service: poly; page: 0')
 					- let size = .3, pad = .04

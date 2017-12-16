@@ -3,9 +3,13 @@ AFRAME.registerComponent('library-item',
 	schema: {type: 'int'},
 	init: function()
 	{
+		this.itemData = null;
+		
 		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
 		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
+
+		this.el.addEventListener('click', this.previewModel.bind(this));
 	},
 	showLoading: function()
 	{
@@ -13,7 +17,7 @@ AFRAME.registerComponent('library-item',
 	},
 	updateContents: function()
 	{
-		let itemData = this.el.parentElement.components['library-page']
+		let itemData = this.itemData = this.el.parentElement.components['library-page']
 			.currentPage.assets[this.data];
 		if(itemData)
 			this.el.setAttribute('src', itemData.thumbnail.url);
@@ -31,11 +35,16 @@ AFRAME.registerComponent('library-item',
 			this.el.setAttribute('scale', {x: ratio, y: 1, z: 1});
 		}
 
-		let itemData = this.el.parentElement.components['library-page']
-			.currentPage.assets[this.data];
-		if(itemData)
+		if(this.itemData)
 			this.el.setAttribute('avr-visible', true);
 		else
 			this.el.setAttribute('avr-visible', false);
+	},
+
+	previewModel: function()
+	{
+		let spawn = document.querySelector('#spawn_point');
+		let gltfUrls = this.itemData.formats.filter(x => x.formatType === 'GLTF2');
+		spawn.setAttribute('src', gltfUrls[0].root.url);
 	}
 });
