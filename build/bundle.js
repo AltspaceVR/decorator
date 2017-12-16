@@ -2066,20 +2066,31 @@ AFRAME.registerComponent('library-page', {
 				while (1) {
 					switch (_context.prev = _context.next) {
 						case 0:
-							_context.next = 2;
+							this.el.emit('pageupdatestart');
+							_context.prev = 1;
+							_context.next = 4;
 							return this.el.sceneEl.systems[this.data.service + '-service'].fakeGetListing(this.data.page);
 
-						case 2:
-							this.currentPage = _context.sent;
-
-							this.el.emit('pageupdated');
-
 						case 4:
+							this.currentPage = _context.sent;
+							_context.next = 10;
+							break;
+
+						case 7:
+							_context.prev = 7;
+							_context.t0 = _context['catch'](1);
+
+							console.error(_context.t0.stack);
+
+						case 10:
+							this.el.emit('pageupdateend');
+
+						case 11:
 						case 'end':
 							return _context.stop();
 					}
 				}
-			}, _callee, this);
+			}, _callee, this, [[1, 7]]);
 		}));
 
 		function update(_x) {
@@ -2093,17 +2104,59 @@ AFRAME.registerComponent('library-page', {
 AFRAME.registerComponent('library-item', {
 	schema: { type: 'int' },
 	init: function init() {
-		this.maxWidth = this.el.getAttribute('width');
-		this.maxHeight = this.el.getAttribute('height');
-		this.el.parentElement.addEventListener('pageupdated', this.updateContents.bind(this));
+		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
+		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
+	},
+	showLoading: function showLoading() {
+		this.el.setAttribute('visible', false);
 	},
 	updateContents: function updateContents() {
 		var itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
-		this.el.setAttribute('src', itemData.thumbnail.url);
+		if (itemData) this.el.setAttribute('src', itemData.thumbnail.url);
 	},
 	updateDimensions: function updateDimensions() {
-		var img = this.el.object3DMap.mesh.material.map.image;
+		var map = this.el.object3DMap.mesh.material.map;
+		var img = map ? map.image : { width: 1, height: 1 };
+		var ratio = img.width / img.height;
+
+		if (ratio > 1) {
+			this.el.setAttribute('scale', { x: 1, y: 1 / ratio, z: 1 });
+		} else {
+			this.el.setAttribute('scale', { x: ratio, y: 1, z: 1 });
+		}
+
+		var itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
+		if (itemData) this.el.setAttribute('visible', true);else this.el.setAttribute('visible', false);
+	}
+});
+
+AFRAME.registerComponent('library-advance', {
+	schema: { type: 'int' },
+	init: function init() {
+		this.el.addEventListener('click', this.advance.bind(this));
+		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
+		this.el.parentElement.addEventListener('pageupdateend', this.updatePaging.bind(this));
+	},
+	advance: function advance() {
+		var pageEl = this.el.parentElement;
+		var oldPage = pageEl.getAttribute('library-page').page;
+		pageEl.setAttribute('library-page', 'page', oldPage + this.data);
+	},
+	showLoading: function showLoading() {
+		this.el.setAttribute('visible', false);
+	},
+	updatePaging: function updatePaging() {
+		var page = this.el.parentElement.components['library-page'];
+		var service = this.el.sceneEl.systems['poly-service'];
+
+		if (service.pages[page.data.page + this.data] || this.data > 0 && page.currentPage.nextPageToken) {
+			console.log('showing');
+			this.el.setAttribute('visible', true);
+		} else {
+			console.log('hiding');
+			this.el.setAttribute('visible', false);
+		}
 	}
 });
 
@@ -2126,83 +2179,88 @@ AFRAME.registerSystem('poly-service', {
 	},
 	getListing: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(page) {
-			var data, json, _prevPage, _data, _json;
+			var data, json, prevPage, _data, _json;
 
 			return regenerator.wrap(function _callee$(_context) {
 				while (1) {
 					switch (_context.prev = _context.next) {
 						case 0:
+							console.log('attemping grab of page', page);
+
 							if (!(page < 0)) {
-								_context.next = 2;
+								_context.next = 3;
 								break;
 							}
 
 							throw new Error('Requested page (' + page + ') before beginning');
 
-						case 2:
+						case 3:
 							if (!this.pages[page]) {
-								_context.next = 6;
+								_context.next = 7;
 								break;
 							}
 
 							return _context.abrupt('return', this.pages[page]);
 
-						case 6:
+						case 7:
 							if (!(page === 0)) {
-								_context.next = 15;
+								_context.next = 16;
 								break;
 							}
 
-							_context.next = 9;
+							_context.next = 10;
 							return loadFile(this.query, this.loader);
 
-						case 9:
+						case 10:
 							data = _context.sent;
 							json = JSON.parse(data);
 
 							this.pages.push(json);
 							return _context.abrupt('return', json);
 
-						case 15:
-							_context.prev = 15;
-							_context.next = 18;
-							return this.getOrFetchListing(page - 1);
+						case 16:
+							prevPage = {};
+							_context.prev = 17;
+							_context.next = 20;
+							return this.getListing(page - 1);
 
-						case 18:
-							_prevPage = _context.sent;
-							_context.next = 24;
+						case 20:
+							prevPage = _context.sent;
+							_context.next = 27;
 							break;
 
-						case 21:
-							_context.prev = 21;
-							_context.t0 = _context['catch'](15);
-							throw new Error('Requested page (' + page + ') past end');
+						case 23:
+							_context.prev = 23;
+							_context.t0 = _context['catch'](17);
 
-						case 24:
+							console.log(_context.t0.stack);
+							throw new Error('Requested page (' + page + ') past end, no previous page');
+
+						case 27:
 							if (!prevPage.nextPageToken) {
-								_context.next = 33;
+								_context.next = 36;
 								break;
 							}
 
-							_context.next = 27;
+							_context.next = 30;
 							return loadFile(this.query + '&pageToken=' + prevPage.nextPageToken, this.loader);
 
-						case 27:
+						case 30:
 							_data = _context.sent;
 							_json = JSON.parse(_data);
 
 							this.pages.push(_json);
 							return _context.abrupt('return', _json);
 
-						case 33:
-							throw new Error('Requested page (' + page + ') past end');
+						case 36:
+							throw new Error('Requested page (' + page + ') past end, no page token');
 
-						case 34:
+						case 37:
 						case 'end':
 							return _context.stop();
 					}
 				}
-			}, _callee, this, [[15, 21]]);
+			}, _callee, this, [[17, 23]]);
 		}));
 
 		function getListing(_x) {
@@ -2242,3 +2300,4 @@ AFRAME.registerSystem('poly-service', {
 });
 
 }());
+//# sourceMappingURL=bundle.js.map

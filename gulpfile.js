@@ -30,14 +30,17 @@ gulp.task('clean', function(){
 
 gulp.task('js-dev', async function()
 {
+	let localBabelConfig = Object.assign({}, babelConfig, {sourceMaps: false});
+	
 	const bundle = await rollup.rollup({
 		input: 'src/js/index.js',
-		plugins: [babel(babelConfig), commonjs(), resolve()]
+		plugins: [babel(localBabelConfig), commonjs(), resolve()]
 	});
 
 	await bundle.write({
 		format: 'iife',
-		file: 'build/bundle.js'
+		file: 'build/bundle.js',
+		sourcemap: true
 	});
 });
 
@@ -53,14 +56,18 @@ gulp.task('html-dev', ['clean'], function(){
 
 gulp.task('js-prod', async function()
 {
+	let localBabelConfig = Object.assign({}, babelConfig, {sourceMaps: true, sourceMapTarget: 'build/bundle.min.js.map'});
 	const bundle = await rollup.rollup({
 		input: 'src/js/index.js',
-		plugins: [babel(babelConfig), commonjs(), resolve(), uglify()]
+		plugins: [babel(localBabelConfig), commonjs(), resolve(), uglify({
+			sourceMap: {filename: 'bundle.min.js', url: 'bundle.min.js.map'}
+		})]
 	});
 
 	await bundle.write({
 		format: 'iife',
-		file: 'build/bundle.min.js'
+		file: 'build/bundle.min.js',
+		sourcemap: true
 	});
 });
 

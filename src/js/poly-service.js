@@ -11,6 +11,7 @@ AFRAME.registerSystem('poly-service', {
 	},
 	getListing: async function(page)
 	{
+		console.log('attemping grab of page', page);
 		if(page < 0)
 			throw new Error(`Requested page (${page}) before beginning`);
 
@@ -26,11 +27,13 @@ AFRAME.registerSystem('poly-service', {
 			return json;
 		}
 		else {
+			let prevPage = {};
 			try {
-				let prevPage = await this.getOrFetchListing(page-1);
+				prevPage = await this.getListing(page-1);
 			}
 			catch(e){
-				throw new Error(`Requested page (${page}) past end`);
+				console.log(e.stack);
+				throw new Error(`Requested page (${page}) past end, no previous page`);
 			}
 
 			if(prevPage.nextPageToken)
@@ -41,7 +44,7 @@ AFRAME.registerSystem('poly-service', {
 				return json;
 			}
 			else {
-				throw new Error(`Requested page (${page}) past end`);
+				throw new Error(`Requested page (${page}) past end, no page token`);
 			}
 		}
 	},

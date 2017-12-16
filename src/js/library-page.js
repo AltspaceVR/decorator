@@ -6,7 +6,13 @@ AFRAME.registerComponent('library-page',
 	},
 	update: async function(oldData)
 	{
-		this.currentPage = await this.el.sceneEl.systems[`${this.data.service}-service`].fakeGetListing(this.data.page);
-		this.el.emit('pageupdated');
+		this.el.emit('pageupdatestart');
+		try {
+			this.currentPage = await this.el.sceneEl.systems[`${this.data.service}-service`].getListing(this.data.page);
+		}
+		catch(e){
+			console.error(e.stack);
+		}
+		this.el.emit('pageupdateend');
 	}
 });
