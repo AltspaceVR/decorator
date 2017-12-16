@@ -10,6 +10,7 @@ AFRAME.registerComponent('hover-scale', {
 			startEvents: ['hoverstart', 'mouseleave'],
 			property: 'scale',
 			dir: 'alternate',
+			easing: 'easeOutQuad',
 			dur: 200
 		});
 
