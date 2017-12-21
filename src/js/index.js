@@ -6,3 +6,6 @@ import './poly-service';
 import './avr-visible';
 import './hover-scale';
 import './maintain-size';
+import './altspace-controls';
+import './grabbable';
+import './collision';

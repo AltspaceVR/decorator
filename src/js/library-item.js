@@ -13,14 +13,13 @@ AFRAME.registerComponent('library-item',
 	},
 	showLoading: function()
 	{
-		this.el.setAttribute('avr-visible', false);
+		this.el.setAttribute('color', '#555');
 	},
 	updateContents: function()
 	{
-		let itemData = this.itemData = this.el.parentElement.components['library-page']
-			.currentPage.assets[this.data];
-		if(itemData)
-			this.el.setAttribute('src', itemData.thumbnail.url);
+		this.itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
+		if(this.itemData)
+			this.el.setAttribute('src', this.itemData.thumbnail.url);
 	},
 	updateDimensions: function()
 	{
@@ -36,9 +35,7 @@ AFRAME.registerComponent('library-item',
 		}
 
 		if(this.itemData)
-			this.el.setAttribute('avr-visible', true);
-		else
-			this.el.setAttribute('avr-visible', false);
+			this.el.setAttribute('color', '#fff');
 	},
 
 	previewModel: function()

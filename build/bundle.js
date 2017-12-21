@@ -2024,11 +2024,24 @@ AFRAME.registerComponent('place-for-space', {
 				while (1) {
 					switch (_context.prev = _context.next) {
 						case 0:
-							_context.next = 2;
+							if (!altspace.inClient) {
+								_context.next = 6;
+								break;
+							}
+
+							_context.next = 3;
 							return altspace.getSpace();
 
-						case 2:
-							space = _context.sent;
+						case 3:
+							_context.t0 = _context.sent;
+							_context.next = 7;
+							break;
+
+						case 6:
+							_context.t0 = {};
+
+						case 7:
+							space = _context.t0;
 
 							console.log(space);
 							index = this.data.templates.indexOf(space.templateSid);
@@ -2039,7 +2052,7 @@ AFRAME.registerComponent('place-for-space', {
 								this.el.setAttribute('mixin', this.data.otherwise);
 							}
 
-						case 6:
+						case 11:
 						case 'end':
 							return _context.stop();
 					}
@@ -2104,16 +2117,20 @@ AFRAME.registerComponent('library-page', {
 AFRAME.registerComponent('library-item', {
 	schema: { type: 'int' },
 	init: function init() {
+		this.itemData = null;
+
 		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
 		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
+
+		this.el.addEventListener('click', this.previewModel.bind(this));
 	},
 	showLoading: function showLoading() {
-		this.el.setAttribute('visible', false);
+		this.el.setAttribute('color', '#555');
 	},
 	updateContents: function updateContents() {
-		var itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
-		if (itemData) this.el.setAttribute('src', itemData.thumbnail.url);
+		this.itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
+		if (this.itemData) this.el.setAttribute('src', this.itemData.thumbnail.url);
 	},
 	updateDimensions: function updateDimensions() {
 		var map = this.el.object3DMap.mesh.material.map;
@@ -2126,36 +2143,44 @@ AFRAME.registerComponent('library-item', {
 			this.el.setAttribute('scale', { x: ratio, y: 1, z: 1 });
 		}
 
-		var itemData = this.el.parentElement.components['library-page'].currentPage.assets[this.data];
-		if (itemData) this.el.setAttribute('visible', true);else this.el.setAttribute('visible', false);
+		if (this.itemData) this.el.setAttribute('color', '#fff');
+	},
+
+	previewModel: function previewModel() {
+		var spawn = document.querySelector('#spawn_point');
+		var gltfUrls = this.itemData.formats.filter(function (x) {
+			return x.formatType === 'GLTF2';
+		});
+		spawn.setAttribute('src', gltfUrls[0].root.url);
 	}
 });
 
 AFRAME.registerComponent('library-advance', {
 	schema: { type: 'int' },
 	init: function init() {
+		this.active = false;
 		this.el.addEventListener('click', this.advance.bind(this));
-		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
 		this.el.parentElement.addEventListener('pageupdateend', this.updatePaging.bind(this));
 	},
 	advance: function advance() {
-		var pageEl = this.el.parentElement;
-		var oldPage = pageEl.getAttribute('library-page').page;
-		pageEl.setAttribute('library-page', 'page', oldPage + this.data);
-	},
-	showLoading: function showLoading() {
-		this.el.setAttribute('visible', false);
+		if (this.active) {
+			var pageEl = this.el.parentElement;
+			var oldPage = pageEl.getAttribute('library-page').page;
+			pageEl.setAttribute('library-page', 'page', oldPage + this.data);
+		}
 	},
 	updatePaging: function updatePaging() {
 		var page = this.el.parentElement.components['library-page'];
 		var service = this.el.sceneEl.systems['poly-service'];
 
 		if (service.pages[page.data.page + this.data] || this.data > 0 && page.currentPage.nextPageToken) {
-			console.log('showing');
-			this.el.setAttribute('visible', true);
+			this.el.setAttribute('avr-visible', true);
+			this.active = true;
+			console.log('advance ' + this.data + ': shown');
 		} else {
-			console.log('hiding');
-			this.el.setAttribute('visible', false);
+			this.el.setAttribute('avr-visible', false);
+			this.active = false;
+			console.log('advance ' + this.data + ': hidden');
 		}
 	}
 });
@@ -2165,6 +2190,12 @@ function loadFile(url) {
 
 	return new _Promise(function (resolve, reject) {
 		loader.load(url, resolve, function () {}, reject);
+	});
+}
+
+function obj2array(obj, keys) {
+	return keys.map(function (k) {
+		return obj[k];
 	});
 }
 
@@ -2297,6 +2328,854 @@ AFRAME.registerSystem('poly-service', {
 
 		return fakeGetListing;
 	}()
+});
+
+AFRAME.registerComponent('avr-visible', {
+	schema: { type: 'boolean', default: false },
+	init: function init() {
+		this.el.addEventListener('model-loaded', this.update.bind(this));
+	},
+	update: function update() {
+		var _this = this;
+
+		console.log('visible update:', this.data);
+		this.el.object3D.traverse(function (o) {
+			return o.visible = _this.data;
+		});
+	}
+});
+
+var scaleFactor = 1.2;
+
+AFRAME.registerComponent('hover-scale', {
+	init: function init() {
+		var _this = this;
+
+		// create animation
+		this.el.setAttribute('animation__hover', {
+			startEvents: ['hoverstart', 'mouseleave'],
+			property: 'scale',
+			dir: 'alternate',
+			easing: 'easeOutQuad',
+			dur: 200
+		});
+
+		// update scale
+		this.el.addEventListener('mouseenter', function () {
+			var smallScale = obj2array(_this.el.getAttribute('scale'), ['x', 'y', 'z']);
+			var bigScale = smallScale.map(function (x) {
+				return x * scaleFactor;
+			});
+			_this.el.setAttribute('animation__hover', { from: smallScale.join(' '), to: bigScale.join(' ') });
+
+			_this.el.emit('hoverstart');
+		});
+	}
+});
+
+AFRAME.registerComponent('maintain-size', {
+	schema: { type: 'vec3' },
+	init: function init() {
+		this.el.addEventListener('model-loaded', this.rescale.bind(this));
+	},
+	rescale: function rescale() {
+		this.el.setAttribute('position', { x: 0, y: 0, z: 0 });
+		this.el.setAttribute('scale', { x: 1, y: 1, z: 1 });
+
+		var box = new AFRAME.THREE.Box3();
+		box.setFromObject(this.el.object3D);
+		var size = box.getSize(),
+		    center = box.getCenter().sub(this.el.object3D.getWorldPosition());
+		var ratio = Math.min(this.data.x / size.x, this.data.y / size.y, this.data.z / size.z);
+
+		this.el.setAttribute('scale', { x: ratio, y: ratio, z: ratio });
+		this.el.setAttribute('position', center.multiplyScalar(-ratio));
+	}
+});
+
+function getGamepads() {
+	if (!altspace.inClient) return _Promise.reject();
+
+	function getPads(resolve, reject) {
+		console.log('Attempting to get controllers');
+		gamepads = altspace.getGamepads();
+		if (gamepads.length > 0) {
+			console.log('Got controllers');
+			resolve(gamepads.filter(function (g) {
+				return !!g.hand;
+			}));
+		} else {
+			reject();
+		}
+	}
+
+	function waitForFocus(resolve, reject) {
+		var scene = document.querySelector('a-scene');
+		function clearAndResolve() {
+			scene.removeEventListener('click', clearAndResolve);
+			resolve();
+		}
+
+		console.log('waiting for focus');
+		scene.addEventListener('click', clearAndResolve);
+	}
+
+	function getPadsRepeatedly(attemptsRemaining) {
+		return new _Promise(getPads).catch(function () {
+			if (--attemptsRemaining > 0) {
+				return new _Promise(function (resolve, reject) {
+					return setTimeout(resolve, 500);
+				}).then(function () {
+					return getPadsRepeatedly(attemptsRemaining);
+				});
+			} else console.log('Failed to get controllers');
+		});
+	}
+
+	return new _Promise(getPads).catch(function () {
+		return new _Promise(waitForFocus);
+	}).then(function () {
+		return getPadsRepeatedly(20);
+	});
+}
+
+var gamepads = [];
+var gamepadsPromise = null;
+
+AFRAME.registerComponent('altspace-controls', {
+	schema: { default: 'right' },
+	init: function () {
+		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee() {
+			var _this = this;
+
+			var pads;
+			return regenerator.wrap(function _callee$(_context) {
+				while (1) {
+					switch (_context.prev = _context.next) {
+						case 0:
+							this.gamepad = null;
+							this.parentInverse = new THREE.Matrix4().getInverse(this.el.parentElement.object3D.matrixWorld);
+							if (!gamepadsPromise) gamepadsPromise = getGamepads();
+
+							if (!(gamepads.length > 0)) {
+								_context.next = 7;
+								break;
+							}
+
+							_context.t0 = gamepads;
+							_context.next = 10;
+							break;
+
+						case 7:
+							_context.next = 9;
+							return gamepadsPromise;
+
+						case 9:
+							_context.t0 = _context.sent;
+
+						case 10:
+							pads = _context.t0;
+
+							this.gamepad = pads.filter(function (p) {
+								return p.hand === _this.data;
+							})[0];
+							if (!this.gamepad) {
+								console.log('No ' + this.data + '-hand controller found');
+							}
+
+						case 13:
+						case 'end':
+							return _context.stop();
+					}
+				}
+			}, _callee, this);
+		}));
+
+		function init() {
+			return _ref.apply(this, arguments);
+		}
+
+		return init;
+	}(),
+	tick: function tick() {
+		if (!this.gamepad) return;
+
+		this.el.object3D.position.copy(this.gamepad.position).applyMatrix4(this.parentInverse);
+		this.el.object3D.quaternion.copy(this.gamepad.rotation);
+
+		if (!this.gripState && this.gamepad.buttons[1].pressed) {
+			this.gripState = true;
+			this.el.emit('gripdown', this.el, false);
+		} else if (this.gripState && !this.gamepad.buttons[1].pressed) {
+			this.gripState = false;
+			this.el.emit('gripup', this.el, false);
+		}
+	}
+});
+
+AFRAME.registerComponent('grabbable', {
+	schema: {
+		by: { type: 'selectorAll' }
+	},
+	init: function init() {
+		var _this = this;
+
+		this.bounds = new AFRAME.THREE.Box3();
+		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
+
+		this._pickup = this.pickup.bind(this);
+		this._drop = this.drop.bind(this);
+
+		this.el.addEventListener('beginContact', function () {
+			return _this.el.setAttribute('color', 'red');
+		});
+		this.el.addEventListener('endContact', function () {
+			return _this.el.setAttribute('color', 'green');
+		});
+	},
+	tick: function tick() {},
+	pickup: function pickup() {},
+	drop: function drop() {},
+	updateBounds: function updateBounds() {
+		this.bounds.setFromObject(this.el.object3D);
+		this.bounds.applyMatrix4(new THREE.Matrix4().getInverse(this.el.object3D.matrixWorld));
+	}
+});
+
+var _meta = createCommonjsModule(function (module) {
+var META = _uid('meta');
+
+
+var setDesc = _objectDp.f;
+var id = 0;
+var isExtensible = Object.isExtensible || function () {
+  return true;
+};
+var FREEZE = !_fails(function () {
+  return isExtensible(Object.preventExtensions({}));
+});
+var setMeta = function (it) {
+  setDesc(it, META, { value: {
+    i: 'O' + ++id, // object ID
+    w: {}          // weak collections IDs
+  } });
+};
+var fastKey = function (it, create) {
+  // return primitive with prefix
+  if (!_isObject(it)) return typeof it == 'symbol' ? it : (typeof it == 'string' ? 'S' : 'P') + it;
+  if (!_has(it, META)) {
+    // can't set metadata to uncaught frozen object
+    if (!isExtensible(it)) return 'F';
+    // not necessary to add metadata
+    if (!create) return 'E';
+    // add missing metadata
+    setMeta(it);
+  // return object ID
+  } return it[META].i;
+};
+var getWeak = function (it, create) {
+  if (!_has(it, META)) {
+    // can't set metadata to uncaught frozen object
+    if (!isExtensible(it)) return true;
+    // not necessary to add metadata
+    if (!create) return false;
+    // add missing metadata
+    setMeta(it);
+  // return hash weak collections IDs
+  } return it[META].w;
+};
+// add metadata on freeze-family methods calling
+var onFreeze = function (it) {
+  if (FREEZE && meta.NEED && isExtensible(it) && !_has(it, META)) setMeta(it);
+  return it;
+};
+var meta = module.exports = {
+  KEY: META,
+  NEED: false,
+  fastKey: fastKey,
+  getWeak: getWeak,
+  onFreeze: onFreeze
+};
+});
+
+var _meta_1 = _meta.KEY;
+var _meta_2 = _meta.NEED;
+var _meta_3 = _meta.fastKey;
+var _meta_4 = _meta.getWeak;
+var _meta_5 = _meta.onFreeze;
+
+var _validateCollection = function (it, TYPE) {
+  if (!_isObject(it) || it._t !== TYPE) throw TypeError('Incompatible receiver, ' + TYPE + ' required!');
+  return it;
+};
+
+var dP$1 = _objectDp.f;
+
+
+
+
+
+
+
+
+
+var fastKey = _meta.fastKey;
+
+var SIZE = _descriptors ? '_s' : 'size';
+
+var getEntry = function (that, key) {
+  // fast case
+  var index = fastKey(key);
+  var entry;
+  if (index !== 'F') return that._i[index];
+  // frozen object case
+  for (entry = that._f; entry; entry = entry.n) {
+    if (entry.k == key) return entry;
+  }
+};
+
+var _collectionStrong = {
+  getConstructor: function (wrapper, NAME, IS_MAP, ADDER) {
+    var C = wrapper(function (that, iterable) {
+      _anInstance(that, C, NAME, '_i');
+      that._t = NAME;         // collection type
+      that._i = _objectCreate(null); // index
+      that._f = undefined;    // first entry
+      that._l = undefined;    // last entry
+      that[SIZE] = 0;         // size
+      if (iterable != undefined) _forOf(iterable, IS_MAP, that[ADDER], that);
+    });
+    _redefineAll(C.prototype, {
+      // 23.1.3.1 Map.prototype.clear()
+      // 23.2.3.2 Set.prototype.clear()
+      clear: function clear() {
+        for (var that = _validateCollection(this, NAME), data = that._i, entry = that._f; entry; entry = entry.n) {
+          entry.r = true;
+          if (entry.p) entry.p = entry.p.n = undefined;
+          delete data[entry.i];
+        }
+        that._f = that._l = undefined;
+        that[SIZE] = 0;
+      },
+      // 23.1.3.3 Map.prototype.delete(key)
+      // 23.2.3.4 Set.prototype.delete(value)
+      'delete': function (key) {
+        var that = _validateCollection(this, NAME);
+        var entry = getEntry(that, key);
+        if (entry) {
+          var next = entry.n;
+          var prev = entry.p;
+          delete that._i[entry.i];
+          entry.r = true;
+          if (prev) prev.n = next;
+          if (next) next.p = prev;
+          if (that._f == entry) that._f = next;
+          if (that._l == entry) that._l = prev;
+          that[SIZE]--;
+        } return !!entry;
+      },
+      // 23.2.3.6 Set.prototype.forEach(callbackfn, thisArg = undefined)
+      // 23.1.3.5 Map.prototype.forEach(callbackfn, thisArg = undefined)
+      forEach: function forEach(callbackfn /* , that = undefined */) {
+        _validateCollection(this, NAME);
+        var f = _ctx(callbackfn, arguments.length > 1 ? arguments[1] : undefined, 3);
+        var entry;
+        while (entry = entry ? entry.n : this._f) {
+          f(entry.v, entry.k, this);
+          // revert to the last existing entry
+          while (entry && entry.r) entry = entry.p;
+        }
+      },
+      // 23.1.3.7 Map.prototype.has(key)
+      // 23.2.3.7 Set.prototype.has(value)
+      has: function has(key) {
+        return !!getEntry(_validateCollection(this, NAME), key);
+      }
+    });
+    if (_descriptors) dP$1(C.prototype, 'size', {
+      get: function () {
+        return _validateCollection(this, NAME)[SIZE];
+      }
+    });
+    return C;
+  },
+  def: function (that, key, value) {
+    var entry = getEntry(that, key);
+    var prev, index;
+    // change existing entry
+    if (entry) {
+      entry.v = value;
+    // create new entry
+    } else {
+      that._l = entry = {
+        i: index = fastKey(key, true), // <- index
+        k: key,                        // <- key
+        v: value,                      // <- value
+        p: prev = that._l,             // <- previous entry
+        n: undefined,                  // <- next entry
+        r: false                       // <- removed
+      };
+      if (!that._f) that._f = entry;
+      if (prev) prev.n = entry;
+      that[SIZE]++;
+      // add to index
+      if (index !== 'F') that._i[index] = entry;
+    } return that;
+  },
+  getEntry: getEntry,
+  setStrong: function (C, NAME, IS_MAP) {
+    // add .keys, .values, .entries, [@@iterator]
+    // 23.1.3.4, 23.1.3.8, 23.1.3.11, 23.1.3.12, 23.2.3.5, 23.2.3.8, 23.2.3.10, 23.2.3.11
+    _iterDefine(C, NAME, function (iterated, kind) {
+      this._t = _validateCollection(iterated, NAME); // target
+      this._k = kind;                     // kind
+      this._l = undefined;                // previous
+    }, function () {
+      var that = this;
+      var kind = that._k;
+      var entry = that._l;
+      // revert to the last existing entry
+      while (entry && entry.r) entry = entry.p;
+      // get next entry
+      if (!that._t || !(that._l = entry = entry ? entry.n : that._t._f)) {
+        // or finish the iteration
+        that._t = undefined;
+        return _iterStep(1);
+      }
+      // return step by kind
+      if (kind == 'keys') return _iterStep(0, entry.k);
+      if (kind == 'values') return _iterStep(0, entry.v);
+      return _iterStep(0, [entry.k, entry.v]);
+    }, IS_MAP ? 'entries' : 'values', !IS_MAP, true);
+
+    // add [@@species], 23.1.2.2, 23.2.2.2
+    _setSpecies(NAME);
+  }
+};
+
+// 7.2.2 IsArray(argument)
+
+var _isArray = Array.isArray || function isArray(arg) {
+  return _cof(arg) == 'Array';
+};
+
+var SPECIES$2 = _wks('species');
+
+var _arraySpeciesConstructor = function (original) {
+  var C;
+  if (_isArray(original)) {
+    C = original.constructor;
+    // cross-realm fallback
+    if (typeof C == 'function' && (C === Array || _isArray(C.prototype))) C = undefined;
+    if (_isObject(C)) {
+      C = C[SPECIES$2];
+      if (C === null) C = undefined;
+    }
+  } return C === undefined ? Array : C;
+};
+
+// 9.4.2.3 ArraySpeciesCreate(originalArray, length)
+
+
+var _arraySpeciesCreate = function (original, length) {
+  return new (_arraySpeciesConstructor(original))(length);
+};
+
+// 0 -> Array#forEach
+// 1 -> Array#map
+// 2 -> Array#filter
+// 3 -> Array#some
+// 4 -> Array#every
+// 5 -> Array#find
+// 6 -> Array#findIndex
+
+
+
+
+
+var _arrayMethods = function (TYPE, $create) {
+  var IS_MAP = TYPE == 1;
+  var IS_FILTER = TYPE == 2;
+  var IS_SOME = TYPE == 3;
+  var IS_EVERY = TYPE == 4;
+  var IS_FIND_INDEX = TYPE == 6;
+  var NO_HOLES = TYPE == 5 || IS_FIND_INDEX;
+  var create = $create || _arraySpeciesCreate;
+  return function ($this, callbackfn, that) {
+    var O = _toObject($this);
+    var self = _iobject(O);
+    var f = _ctx(callbackfn, that, 3);
+    var length = _toLength(self.length);
+    var index = 0;
+    var result = IS_MAP ? create($this, length) : IS_FILTER ? create($this, 0) : undefined;
+    var val, res;
+    for (;length > index; index++) if (NO_HOLES || index in self) {
+      val = self[index];
+      res = f(val, index, O);
+      if (TYPE) {
+        if (IS_MAP) result[index] = res;   // map
+        else if (res) switch (TYPE) {
+          case 3: return true;             // some
+          case 5: return val;              // find
+          case 6: return index;            // findIndex
+          case 2: result.push(val);        // filter
+        } else if (IS_EVERY) return false; // every
+      }
+    }
+    return IS_FIND_INDEX ? -1 : IS_SOME || IS_EVERY ? IS_EVERY : result;
+  };
+};
+
+var dP$2 = _objectDp.f;
+var each = _arrayMethods(0);
+
+
+var _collection = function (NAME, wrapper, methods, common, IS_MAP, IS_WEAK) {
+  var Base = _global[NAME];
+  var C = Base;
+  var ADDER = IS_MAP ? 'set' : 'add';
+  var proto = C && C.prototype;
+  var O = {};
+  if (!_descriptors || typeof C != 'function' || !(IS_WEAK || proto.forEach && !_fails(function () {
+    new C().entries().next();
+  }))) {
+    // create collection constructor
+    C = common.getConstructor(wrapper, NAME, IS_MAP, ADDER);
+    _redefineAll(C.prototype, methods);
+    _meta.NEED = true;
+  } else {
+    C = wrapper(function (target, iterable) {
+      _anInstance(target, C, NAME, '_c');
+      target._c = new Base();
+      if (iterable != undefined) _forOf(iterable, IS_MAP, target[ADDER], target);
+    });
+    each('add,clear,delete,forEach,get,has,set,keys,values,entries,toJSON'.split(','), function (KEY) {
+      var IS_ADDER = KEY == 'add' || KEY == 'set';
+      if (KEY in proto && !(IS_WEAK && KEY == 'clear')) _hide(C.prototype, KEY, function (a, b) {
+        _anInstance(this, C, KEY);
+        if (!IS_ADDER && IS_WEAK && !_isObject(a)) return KEY == 'get' ? undefined : false;
+        var result = this._c[KEY](a === 0 ? 0 : a, b);
+        return IS_ADDER ? this : result;
+      });
+    });
+    IS_WEAK || dP$2(C.prototype, 'size', {
+      get: function () {
+        return this._c.size;
+      }
+    });
+  }
+
+  _setToStringTag(C, NAME);
+
+  O[NAME] = C;
+  _export(_export.G + _export.W + _export.F, O);
+
+  if (!IS_WEAK) common.setStrong(C, NAME, IS_MAP);
+
+  return C;
+};
+
+var MAP = 'Map';
+
+// 23.1 Map Objects
+var es6_map = _collection(MAP, function (get) {
+  return function Map() { return get(this, arguments.length > 0 ? arguments[0] : undefined); };
+}, {
+  // 23.1.3.6 Map.prototype.get(key)
+  get: function get(key) {
+    var entry = _collectionStrong.getEntry(_validateCollection(this, MAP), key);
+    return entry && entry.v;
+  },
+  // 23.1.3.9 Map.prototype.set(key, value)
+  set: function set(key, value) {
+    return _collectionStrong.def(_validateCollection(this, MAP), key === 0 ? 0 : key, value);
+  }
+}, _collectionStrong, true);
+
+var _arrayFromIterable = function (iter, ITERATOR) {
+  var result = [];
+  _forOf(iter, false, result.push, result, ITERATOR);
+  return result;
+};
+
+// https://github.com/DavidBruant/Map-Set.prototype.toJSON
+
+
+var _collectionToJson = function (NAME) {
+  return function toJSON() {
+    if (_classof(this) != NAME) throw TypeError(NAME + "#toJSON isn't generic");
+    return _arrayFromIterable(this);
+  };
+};
+
+// https://github.com/DavidBruant/Map-Set.prototype.toJSON
+
+
+_export(_export.P + _export.R, 'Map', { toJSON: _collectionToJson('Map') });
+
+// https://tc39.github.io/proposal-setmap-offrom/
+
+
+var _setCollectionOf = function (COLLECTION) {
+  _export(_export.S, COLLECTION, { of: function of() {
+    var length = arguments.length;
+    var A = Array(length);
+    while (length--) A[length] = arguments[length];
+    return new this(A);
+  } });
+};
+
+// https://tc39.github.io/proposal-setmap-offrom/#sec-map.of
+_setCollectionOf('Map');
+
+// https://tc39.github.io/proposal-setmap-offrom/
+
+
+
+
+
+var _setCollectionFrom = function (COLLECTION) {
+  _export(_export.S, COLLECTION, { from: function from(source /* , mapFn, thisArg */) {
+    var mapFn = arguments[1];
+    var mapping, A, n, cb;
+    _aFunction(this);
+    mapping = mapFn !== undefined;
+    if (mapping) _aFunction(mapFn);
+    if (source == undefined) return new this();
+    A = [];
+    if (mapping) {
+      n = 0;
+      cb = _ctx(mapFn, arguments[2], 2);
+      _forOf(source, false, function (nextItem) {
+        A.push(cb(nextItem, n++));
+      });
+    } else {
+      _forOf(source, false, A.push, A);
+    }
+    return new this(A);
+  } });
+};
+
+// https://tc39.github.io/proposal-setmap-offrom/#sec-map.from
+_setCollectionFrom('Map');
+
+var map$1 = _core.Map;
+
+var map = createCommonjsModule(function (module) {
+module.exports = { "default": map$1, __esModule: true };
+});
+
+var _Map = unwrapExports(map);
+
+var classCallCheck = createCommonjsModule(function (module, exports) {
+exports.__esModule = true;
+
+exports.default = function (instance, Constructor) {
+  if (!(instance instanceof Constructor)) {
+    throw new TypeError("Cannot call a class as a function");
+  }
+};
+});
+
+var _classCallCheck = unwrapExports(classCallCheck);
+
+// 19.1.2.4 / 15.2.3.6 Object.defineProperty(O, P, Attributes)
+_export(_export.S + _export.F * !_descriptors, 'Object', { defineProperty: _objectDp.f });
+
+var $Object = _core.Object;
+var defineProperty$2 = function defineProperty(it, key, desc) {
+  return $Object.defineProperty(it, key, desc);
+};
+
+var defineProperty = createCommonjsModule(function (module) {
+module.exports = { "default": defineProperty$2, __esModule: true };
+});
+
+unwrapExports(defineProperty);
+
+var createClass = createCommonjsModule(function (module, exports) {
+exports.__esModule = true;
+
+
+
+var _defineProperty2 = _interopRequireDefault(defineProperty);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = function () {
+  function defineProperties(target, props) {
+    for (var i = 0; i < props.length; i++) {
+      var descriptor = props[i];
+      descriptor.enumerable = descriptor.enumerable || false;
+      descriptor.configurable = true;
+      if ("value" in descriptor) descriptor.writable = true;
+      (0, _defineProperty2.default)(target, descriptor.key, descriptor);
+    }
+  }
+
+  return function (Constructor, protoProps, staticProps) {
+    if (protoProps) defineProperties(Constructor.prototype, protoProps);
+    if (staticProps) defineProperties(Constructor, staticProps);
+    return Constructor;
+  };
+}();
+});
+
+var _createClass = unwrapExports(createClass);
+
+var DoubleMap = function () {
+	function DoubleMap() {
+		_classCallCheck(this, DoubleMap);
+
+		this.aToB = new _Map();
+		this.bToA = new _Map();
+	}
+
+	_createClass(DoubleMap, [{
+		key: "set",
+		value: function set(a, b) {
+			var oldA = this.bToA.get(b),
+			    oldB = this.aToB.get(a);
+			if (oldA !== a || oldB !== b) {
+				this.aToB.delete(oldA);
+				this.bToA.delete(oldB);
+			}
+
+			this.aToB.set(a, b);
+			this.bToA.set(b, a);
+		}
+	}, {
+		key: "getB",
+		value: function getB(a) {
+			return this.aToB.get(a);
+		}
+	}, {
+		key: "getA",
+		value: function getA(b) {
+			return this.bToA.get(b);
+		}
+	}, {
+		key: "forEach",
+		value: function forEach(fn) {
+			return this.bToA.forEach(fn);
+		}
+	}]);
+
+	return DoubleMap;
+}();
+
+/* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
+
+AFRAME.registerSystem('collision', {
+	init: function init() {
+		var _this = this;
+
+		// entity mapping
+		this.el2co = new DoubleMap();
+		this.el2localBounds = new _Map();
+		this._regQueue = [];
+		this._step = 0;
+
+		// ammo setup
+		Ammo().then(function () {
+			var collisionConfig = new Ammo.btDefaultCollisionConfiguration();
+			var dispatcher = new Ammo.btCollisionDispatcher(collisionConfig);
+			var solver = new Ammo.btSequentialImpulseConstraintSolver();
+			var broadphase = new Ammo.btDbvtBroadphase();
+			_this.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfig);
+
+			_this._regQueue.forEach(function (el) {
+				return _this.registerCollisionBody(el);
+			});
+			_this._regQueue = null;
+		});
+	},
+
+	tick: function tick() {
+		var _this2 = this;
+
+		if (!this.world) return;
+
+		// update dynamic object transforms
+		this.el2co.forEach(function (el, co) {
+			if (!el.getAttribute('collision').kinematic) {
+				return;
+			}
+
+			var localBounds = _this2.el2localBounds.get(el);
+			var worldPos = el.object3D.localToWorld(localBounds.getCenter());
+			var worldRot = el.object3D.getWorldQuaternion();
+			var worldScale = el.object3D.getWorldScale();
+			var transform = co.getWorldTransform();
+			var shape = co.getCollisionShape();
+
+			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
+			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
+			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+		});
+
+		this.world.stepSimulation(this._step++);
+
+		var dispatcher = this.world.getDispatcher();
+		var hitCount = dispatcher.getNumManifolds();
+		for (var i = 0; i < hitCount; i++) {
+			var manifold = dispatcher.getManifoldByIndexInternal(i);
+			var co1 = manifold.getBody0(),
+			    co2 = manifold.getBody1();
+			var el1 = this.el2co.getA(co1),
+			    el2 = this.el2co.getA(co2);
+			if (el1.getAttribute('collision').with.includes(el2) && el2.getAttribute('collision').with.includes(el1)) {
+				console.log('fire event!');
+				//el2.dispatchEvent('collision-start', el1, false);
+				//el1.dispatchEvent('collision-start', el2, false);
+			}
+		}
+	},
+
+	registerCollisionBody: function registerCollisionBody(el) {
+		if (!this.world) {
+			this._regQueue.push(el);
+			return;
+		}
+
+		// compute bounding box of entity
+		var bounds = new AFRAME.THREE.Box3();
+		bounds.setFromObject(el.object3DMap.mesh);
+		var inv = new THREE.Matrix4().getInverse(el.object3D.matrixWorld);
+		bounds.applyMatrix4(inv);
+		this.el2localBounds.set(el, bounds);
+
+		// create shape
+		var size = bounds.getSize();
+		var halfExtants = new Ammo.btVector3(size.x, size.y, size.z);
+		var shape = new Ammo.btBoxShape(halfExtants);
+		var co = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(1, null, shape));
+		this.el2co.set(el, co);
+
+		this.world.addCollisionObject(co);
+	},
+	removeCollisionBody: function removeCollisionBody(el) {},
+	isRegistered: function isRegistered(el) {
+		return !!this.el2co.getB(el);
+	}
+});
+
+AFRAME.registerComponent('collision', {
+	schema: {
+		with: { type: 'selectorAll' },
+		kinematic: { type: 'boolean', default: false }
+	},
+	init: function init() {
+		if (this.el.object3DMap.mesh) this.updateBounds();
+		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
+	},
+	updateBounds: function updateBounds() {
+		if (this.system.isRegistered(this.el)) this.system.removeCollisionBody(this.el);
+		this.system.registerCollisionBody(this.el);
+	},
+	remove: function remove() {
+		this.system.removeCollisionBody(this.el);
+	}
 });
 
 }());
