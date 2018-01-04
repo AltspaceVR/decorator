@@ -5,13 +5,14 @@ html
 		if production
 			script(src='https://aframe.io/releases/0.7.0/aframe.min.js')
 			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.min.js')
+			script(src='https://cdn.rawgit.com/kripken/ammo.js/1296d374/builds/ammo.js')
 			script(src='build/bundle.min.js')
 		else
 			script(src='https://aframe.io/releases/0.7.0/aframe.js')
 			//-script(src='http://localhost:8001/dist/altspace.js')
 			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.js')
+			script(src='lib/ammo.js')
 			script(src='build/bundle.js')
-		script(src='https://cdn.rawgit.com/kripken/ammo.js/1296d374/builds/ammo.js')
 		script(src="https://unpkg.com/aframe-animation-component/dist/aframe-animation-component.min.js")
 			
 	body
@@ -26,10 +27,11 @@ html
 
 				a-sphere(radius='.005')
 
-				a-entity#spawn_point(position='1 .05 -.3')
-					a-gltf-model(src='#pedestal_model', altspace-cursor-collider='enabled: false')
-					a-gltf-model#spawn(position='0 .5 0', maintain-size='1 1 1', grabbable='by: #lefthand,#righthand')
-					a-box#eventtest(position='0 0 1', collision='with: #lefthand,#righthand')
+				a-entity#spawn_point(position='1 .55 2')
+					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
+					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', grabbable,
+						src='https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
+					//a-box#eventtest(position='0 0 1', collision='with: #lefthand,#righthand', grabbable)
 
 				a-entity#spawn_menu(position='-1 1 0' library-page='service: poly; page: 0')
 					- let size = .3, pad = .04
@@ -50,7 +52,9 @@ html
 						library-advance='1')
 						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Next; font-size: 1')
 
-			a-sphere#lefthand(radius=.005, color='blue', altspace-controls='left', collision='with: #eventtest; kinematic: true')
-			a-sphere#righthand(radius=.005, color='red', altspace-controls='right', collision='with: #eventtest; kinematic: true')
-
+			a-sphere#lefthand(radius=.005, altspace-controls='left', grab-indicator,
+				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
+			a-sphere#righthand(radius=.005, altspace-controls='right', grab-indicator,
+				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
+			a-sphere(radius=.1)
 			a-entity(position='0 0 2'): a-camera: a-cursor

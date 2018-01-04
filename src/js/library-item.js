@@ -40,7 +40,7 @@ AFRAME.registerComponent('library-item',
 
 	previewModel: function()
 	{
-		let spawn = document.querySelector('#spawn_point');
+		let spawn = document.querySelector('#spawn');
 		let gltfUrls = this.itemData.formats.filter(x => x.formatType === 'GLTF2');
 		spawn.setAttribute('src', gltfUrls[0].root.url);
 	}

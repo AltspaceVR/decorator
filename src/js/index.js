@@ -9,3 +9,4 @@ import './maintain-size';
 import './altspace-controls';
 import './grabbable';
 import './collision';
+import './grab-indicator';

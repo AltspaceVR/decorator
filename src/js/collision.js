@@ -1,4 +1,6 @@
 import DoubleMap from './double-map';
+import includes from 'core-js/fn/array/includes';
+import {set_difference} from './utils';
 
 /* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
 
@@ -9,19 +11,23 @@ AFRAME.registerSystem('collision',
 		// entity mapping
 		this.el2co = new DoubleMap();
 		this.el2localBounds = new Map();
-		this._regQueue = [];
-		this._step = 0;
+		this.regQueue = [];
+		this.manifolds = new Set();
+		this.forceUpdateObjects = new Set();
+		this._debugMeshes = new Map();
 
 		// ammo setup
 		Ammo().then(() => {
 			let collisionConfig = new Ammo.btDefaultCollisionConfiguration();
 			let dispatcher = new Ammo.btCollisionDispatcher(collisionConfig);
-			let solver = new Ammo.btSequentialImpulseConstraintSolver();
-			let broadphase = new Ammo.btDbvtBroadphase();
-			this.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfig);
+			let broadphase = new Ammo.btAxisSweep3(
+				new Ammo.btVector3(-100,-100,-100),
+				new Ammo.btVector3(100,100,100)
+			);
+			this.world = new Ammo.btCollisionWorld(dispatcher, broadphase, collisionConfig);
 
-			this._regQueue.forEach(el => this.registerCollisionBody(el));
-			this._regQueue = null;
+			this.regQueue.forEach(el => this.registerCollisionBody(el));
+			this.regQueue = null;
 		});
 	},
 	
@@ -29,10 +35,10 @@ AFRAME.registerSystem('collision',
 	{
 		if(!this.world) return;
 
-		// update dynamic object transforms
+		// update object transforms
 		this.el2co.forEach((el, co) => 
 		{
-			if(!el.getAttribute('collision').kinematic){
+			if(!this.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic){
 				return;
 			}
 
@@ -43,33 +49,74 @@ AFRAME.registerSystem('collision',
 			let transform = co.getWorldTransform();
 			let shape = co.getCollisionShape();
 
+			if(el.id === 'spawn'){
+				console.log(worldPos, worldRot, new THREE.Vector3().multiplyVectors(worldScale, localBounds.getSize()));
+			}
 			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
 			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
 			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+
+			this.forceUpdateObjects.delete(el);
+
+			if(this.el.sceneEl.components.debug && this._debugMeshes.has(el)){
+				let mesh = this._debugMeshes.get(el);
+				console.log(mesh);
+				mesh.position.copy(worldPos);
+				mesh.quaternion.copy(worldRot);
+				mesh.scale.copy(worldScale);
+			}
 		});
 
-		this.world.stepSimulation(this._step++);
+		// update collision list
+		this.world.performDiscreteCollisionDetection();
 
+		// get list of intersecting objects
 		let dispatcher = this.world.getDispatcher();
 		let hitCount = dispatcher.getNumManifolds();
-		for(let i=0; i<hitCount; i++)
-		{
+		let hits = new Set();
+		for(let i=0; i<hitCount; i++){
 			let manifold = dispatcher.getManifoldByIndexInternal(i);
+			hits.add(manifold);
+		}
+
+		// detect collision-start
+		let newHits = set_difference(hits, this.manifolds);
+		for(let manifold of newHits)
+		{
 			let co1 = manifold.getBody0(), co2 = manifold.getBody1();
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
-			if(el1.getAttribute('collision').with.includes(el2) && el2.getAttribute('collision').with.includes(el1))
+			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
+			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
-				console.log('fire event!');
-				//el2.dispatchEvent('collision-start', el1, false);
-				//el1.dispatchEvent('collision-start', el2, false);
+				console.log('collision start');
+				el2.emit('collision-start', el1, false);
+				el1.emit('collision-start', el2, false);
 			}
 		}
+
+		// detect collision-end
+		let oldHits = set_difference(this.manifolds, hits);
+		for(let manifold of oldHits)
+		{
+			let co1 = manifold.getBody0(), co2 = manifold.getBody1();
+			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
+			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
+			if(el1targets.includes(el2) && el2targets.includes(el1))
+			{
+				console.log('collision end');
+				el2.emit('collision-end', el1, false);
+				el1.emit('collision-end', el2, false);
+			}
+		}
+
+		// remember last frame's collisions
+		this.manifolds = hits;
 	},
 
 	registerCollisionBody(el)
 	{
 		if(!this.world){
-			this._regQueue.push(el);
+			this.regQueue.push(el);
 			return;
 		}
 
@@ -82,17 +129,34 @@ AFRAME.registerSystem('collision',
 
 		// create shape
 		let size = bounds.getSize();
-		let halfExtants = new Ammo.btVector3(size.x, size.y, size.z);
-		let shape = new Ammo.btBoxShape(halfExtants);
-		let co = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(1, null, shape));
+		let halfExtants = new Ammo.btVector3(size.x/2, size.y/2, size.z/2);
+		let co = new Ammo.btCollisionObject();
+		co.setCollisionShape(new Ammo.btBoxShape(halfExtants));
 		this.el2co.set(el, co);
 
 		this.world.addCollisionObject(co);
+
+		// create debug mesh
+		if(this.el.sceneEl.components.debug){
+			let mesh = new THREE.Mesh(
+				new THREE.BoxBufferGeometry(size.x, size.y, size.z),
+				new THREE.MeshBasicMaterial({color: 'magenta', transparent: true, opacity: .2})
+			);
+			this._debugMeshes.set(el, mesh);
+			this.el.sceneEl.object3D.add(mesh);
+		}
 	},
 
 	removeCollisionBody(el)
 	{
+		let co = this.el2co.getB(el);
+		this.world.removeCollisionObject(co);
+		this.el2co.deleteA(el);
 
+		if(this.el.sceneEl.components.debug){
+			this.el.sceneEl.object3D.remove(this._debugMeshes.get(el));
+			this._debugMeshes.delete(el);
+		}
 	},
 
 	isRegistered(el){
@@ -114,6 +178,10 @@ AFRAME.registerComponent('collision', {
 		if(this.system.isRegistered(this.el))
 			this.system.removeCollisionBody(this.el);
 		this.system.registerCollisionBody(this.el);
+		this.updateTransform();
+	},
+	updateTransform: function(){
+		this.system.forceUpdateObjects.add(this.el);
 	},
 	remove: function(){
 		this.system.removeCollisionBody(this.el);

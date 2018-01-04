@@ -812,7 +812,7 @@ if (typeof __g == 'number') __g = global; // eslint-disable-line no-undef
 });
 
 var _core = createCommonjsModule(function (module) {
-var core = module.exports = { version: '2.5.1' };
+var core = module.exports = { version: '2.5.3' };
 if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
 });
 
@@ -1225,7 +1225,7 @@ var _iterDefine = function (Base, NAME, Constructor, next, DEFAULT, IS_SET, FORC
   var VALUES_BUG = false;
   var proto = Base.prototype;
   var $native = proto[ITERATOR] || proto[FF_ITERATOR] || DEFAULT && proto[DEFAULT];
-  var $default = $native || getMethod(DEFAULT);
+  var $default = (!BUGGY && $native) || getMethod(DEFAULT);
   var $entries = DEFAULT ? !DEF_VALUES ? $default : getMethod('entries') : undefined;
   var $anyNative = NAME == 'Array' ? proto.entries || $native : $native;
   var methods, key, IteratorPrototype;
@@ -1548,8 +1548,8 @@ var _microtask = function () {
     notify = function () {
       process$2.nextTick(flush);
     };
-  // browsers with MutationObserver
-  } else if (Observer) {
+  // browsers with MutationObserver, except iOS Safari - https://github.com/zloirock/core-js/issues/339
+  } else if (Observer && !(_global.navigator && _global.navigator.standalone)) {
     var toggle = true;
     var node = document.createTextNode('');
     new Observer(flush).observe(node, { characterData: true }); // eslint-disable-line no-new
@@ -1762,14 +1762,7 @@ var onUnhandled = function (promise) {
   });
 };
 var isUnhandled = function (promise) {
-  if (promise._h == 1) return false;
-  var chain = promise._a || promise._c;
-  var i = 0;
-  var reaction;
-  while (chain.length > i) {
-    reaction = chain[i++];
-    if (reaction.fail || !isUnhandled(reaction.promise)) return false;
-  } return true;
+  return promise._h !== 1 && (promise._a || promise._c).length === 0;
 };
 var onHandleUnhandled = function (promise) {
   task.call(_global, function () {
@@ -2019,6 +2012,8 @@ AFRAME.registerComponent('place-for-space', {
 	},
 	init: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee() {
+			var _this = this;
+
 			var space, index;
 			return regenerator.wrap(function _callee$(_context) {
 				while (1) {
@@ -2051,8 +2046,14 @@ AFRAME.registerComponent('place-for-space', {
 							} else {
 								this.el.setAttribute('mixin', this.data.otherwise);
 							}
+							setTimeout(function () {
+								Array.prototype.slice.call(_this.el.querySelectorAll('[collision]')).forEach(function (el) {
+									console.log('updating xfrm of ' + el.id);
+									el.components.collision.updateTransform();
+								});
+							}, 0);
 
-						case 11:
+						case 12:
 						case 'end':
 							return _context.stop();
 					}
@@ -2147,7 +2148,7 @@ AFRAME.registerComponent('library-item', {
 	},
 
 	previewModel: function previewModel() {
-		var spawn = document.querySelector('#spawn_point');
+		var spawn = document.querySelector('#spawn');
 		var gltfUrls = this.itemData.formats.filter(function (x) {
 			return x.formatType === 'GLTF2';
 		});
@@ -2185,362 +2186,19 @@ AFRAME.registerComponent('library-advance', {
 	}
 });
 
-function loadFile(url) {
-	var loader = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new AFRAME.THREE.FileLoader();
+var core_getIterator = _core.getIterator = function (it) {
+  var iterFn = core_getIteratorMethod(it);
+  if (typeof iterFn != 'function') throw TypeError(it + ' is not iterable!');
+  return _anObject(iterFn.call(it));
+};
 
-	return new _Promise(function (resolve, reject) {
-		loader.load(url, resolve, function () {}, reject);
-	});
-}
+var getIterator$1 = core_getIterator;
 
-function obj2array(obj, keys) {
-	return keys.map(function (k) {
-		return obj[k];
-	});
-}
-
-AFRAME.registerSystem('poly-service', {
-	schema: {
-		key: { type: 'string' }
-	},
-	init: function init() {
-		this.pages = [];
-		this.loader = new AFRAME.THREE.FileLoader();
-		this.query = 'https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&pageSize=20&key=' + this.data.key;
-	},
-	getListing: function () {
-		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(page) {
-			var data, json, prevPage, _data, _json;
-
-			return regenerator.wrap(function _callee$(_context) {
-				while (1) {
-					switch (_context.prev = _context.next) {
-						case 0:
-							console.log('attemping grab of page', page);
-
-							if (!(page < 0)) {
-								_context.next = 3;
-								break;
-							}
-
-							throw new Error('Requested page (' + page + ') before beginning');
-
-						case 3:
-							if (!this.pages[page]) {
-								_context.next = 7;
-								break;
-							}
-
-							return _context.abrupt('return', this.pages[page]);
-
-						case 7:
-							if (!(page === 0)) {
-								_context.next = 16;
-								break;
-							}
-
-							_context.next = 10;
-							return loadFile(this.query, this.loader);
-
-						case 10:
-							data = _context.sent;
-							json = JSON.parse(data);
-
-							this.pages.push(json);
-							return _context.abrupt('return', json);
-
-						case 16:
-							prevPage = {};
-							_context.prev = 17;
-							_context.next = 20;
-							return this.getListing(page - 1);
-
-						case 20:
-							prevPage = _context.sent;
-							_context.next = 27;
-							break;
-
-						case 23:
-							_context.prev = 23;
-							_context.t0 = _context['catch'](17);
-
-							console.log(_context.t0.stack);
-							throw new Error('Requested page (' + page + ') past end, no previous page');
-
-						case 27:
-							if (!prevPage.nextPageToken) {
-								_context.next = 36;
-								break;
-							}
-
-							_context.next = 30;
-							return loadFile(this.query + '&pageToken=' + prevPage.nextPageToken, this.loader);
-
-						case 30:
-							_data = _context.sent;
-							_json = JSON.parse(_data);
-
-							this.pages.push(_json);
-							return _context.abrupt('return', _json);
-
-						case 36:
-							throw new Error('Requested page (' + page + ') past end, no page token');
-
-						case 37:
-						case 'end':
-							return _context.stop();
-					}
-				}
-			}, _callee, this, [[17, 23]]);
-		}));
-
-		function getListing(_x) {
-			return _ref.apply(this, arguments);
-		}
-
-		return getListing;
-	}(),
-	fakeGetListing: function () {
-		var _ref2 = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee2(page) {
-			var data;
-			return regenerator.wrap(function _callee2$(_context2) {
-				while (1) {
-					switch (_context2.prev = _context2.next) {
-						case 0:
-							_context2.next = 2;
-							return loadFile('testdata/listing.json', this.loader);
-
-						case 2:
-							data = _context2.sent;
-							return _context2.abrupt('return', JSON.parse(data));
-
-						case 4:
-						case 'end':
-							return _context2.stop();
-					}
-				}
-			}, _callee2, this);
-		}));
-
-		function fakeGetListing(_x2) {
-			return _ref2.apply(this, arguments);
-		}
-
-		return fakeGetListing;
-	}()
+var getIterator = createCommonjsModule(function (module) {
+module.exports = { "default": getIterator$1, __esModule: true };
 });
 
-AFRAME.registerComponent('avr-visible', {
-	schema: { type: 'boolean', default: false },
-	init: function init() {
-		this.el.addEventListener('model-loaded', this.update.bind(this));
-	},
-	update: function update() {
-		var _this = this;
-
-		console.log('visible update:', this.data);
-		this.el.object3D.traverse(function (o) {
-			return o.visible = _this.data;
-		});
-	}
-});
-
-var scaleFactor = 1.2;
-
-AFRAME.registerComponent('hover-scale', {
-	init: function init() {
-		var _this = this;
-
-		// create animation
-		this.el.setAttribute('animation__hover', {
-			startEvents: ['hoverstart', 'mouseleave'],
-			property: 'scale',
-			dir: 'alternate',
-			easing: 'easeOutQuad',
-			dur: 200
-		});
-
-		// update scale
-		this.el.addEventListener('mouseenter', function () {
-			var smallScale = obj2array(_this.el.getAttribute('scale'), ['x', 'y', 'z']);
-			var bigScale = smallScale.map(function (x) {
-				return x * scaleFactor;
-			});
-			_this.el.setAttribute('animation__hover', { from: smallScale.join(' '), to: bigScale.join(' ') });
-
-			_this.el.emit('hoverstart');
-		});
-	}
-});
-
-AFRAME.registerComponent('maintain-size', {
-	schema: { type: 'vec3' },
-	init: function init() {
-		this.el.addEventListener('model-loaded', this.rescale.bind(this));
-	},
-	rescale: function rescale() {
-		this.el.setAttribute('position', { x: 0, y: 0, z: 0 });
-		this.el.setAttribute('scale', { x: 1, y: 1, z: 1 });
-
-		var box = new AFRAME.THREE.Box3();
-		box.setFromObject(this.el.object3D);
-		var size = box.getSize(),
-		    center = box.getCenter().sub(this.el.object3D.getWorldPosition());
-		var ratio = Math.min(this.data.x / size.x, this.data.y / size.y, this.data.z / size.z);
-
-		this.el.setAttribute('scale', { x: ratio, y: ratio, z: ratio });
-		this.el.setAttribute('position', center.multiplyScalar(-ratio));
-	}
-});
-
-function getGamepads() {
-	if (!altspace.inClient) return _Promise.reject();
-
-	function getPads(resolve, reject) {
-		console.log('Attempting to get controllers');
-		gamepads = altspace.getGamepads();
-		if (gamepads.length > 0) {
-			console.log('Got controllers');
-			resolve(gamepads.filter(function (g) {
-				return !!g.hand;
-			}));
-		} else {
-			reject();
-		}
-	}
-
-	function waitForFocus(resolve, reject) {
-		var scene = document.querySelector('a-scene');
-		function clearAndResolve() {
-			scene.removeEventListener('click', clearAndResolve);
-			resolve();
-		}
-
-		console.log('waiting for focus');
-		scene.addEventListener('click', clearAndResolve);
-	}
-
-	function getPadsRepeatedly(attemptsRemaining) {
-		return new _Promise(getPads).catch(function () {
-			if (--attemptsRemaining > 0) {
-				return new _Promise(function (resolve, reject) {
-					return setTimeout(resolve, 500);
-				}).then(function () {
-					return getPadsRepeatedly(attemptsRemaining);
-				});
-			} else console.log('Failed to get controllers');
-		});
-	}
-
-	return new _Promise(getPads).catch(function () {
-		return new _Promise(waitForFocus);
-	}).then(function () {
-		return getPadsRepeatedly(20);
-	});
-}
-
-var gamepads = [];
-var gamepadsPromise = null;
-
-AFRAME.registerComponent('altspace-controls', {
-	schema: { default: 'right' },
-	init: function () {
-		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee() {
-			var _this = this;
-
-			var pads;
-			return regenerator.wrap(function _callee$(_context) {
-				while (1) {
-					switch (_context.prev = _context.next) {
-						case 0:
-							this.gamepad = null;
-							this.parentInverse = new THREE.Matrix4().getInverse(this.el.parentElement.object3D.matrixWorld);
-							if (!gamepadsPromise) gamepadsPromise = getGamepads();
-
-							if (!(gamepads.length > 0)) {
-								_context.next = 7;
-								break;
-							}
-
-							_context.t0 = gamepads;
-							_context.next = 10;
-							break;
-
-						case 7:
-							_context.next = 9;
-							return gamepadsPromise;
-
-						case 9:
-							_context.t0 = _context.sent;
-
-						case 10:
-							pads = _context.t0;
-
-							this.gamepad = pads.filter(function (p) {
-								return p.hand === _this.data;
-							})[0];
-							if (!this.gamepad) {
-								console.log('No ' + this.data + '-hand controller found');
-							}
-
-						case 13:
-						case 'end':
-							return _context.stop();
-					}
-				}
-			}, _callee, this);
-		}));
-
-		function init() {
-			return _ref.apply(this, arguments);
-		}
-
-		return init;
-	}(),
-	tick: function tick() {
-		if (!this.gamepad) return;
-
-		this.el.object3D.position.copy(this.gamepad.position).applyMatrix4(this.parentInverse);
-		this.el.object3D.quaternion.copy(this.gamepad.rotation);
-
-		if (!this.gripState && this.gamepad.buttons[1].pressed) {
-			this.gripState = true;
-			this.el.emit('gripdown', this.el, false);
-		} else if (this.gripState && !this.gamepad.buttons[1].pressed) {
-			this.gripState = false;
-			this.el.emit('gripup', this.el, false);
-		}
-	}
-});
-
-AFRAME.registerComponent('grabbable', {
-	schema: {
-		by: { type: 'selectorAll' }
-	},
-	init: function init() {
-		var _this = this;
-
-		this.bounds = new AFRAME.THREE.Box3();
-		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
-
-		this._pickup = this.pickup.bind(this);
-		this._drop = this.drop.bind(this);
-
-		this.el.addEventListener('beginContact', function () {
-			return _this.el.setAttribute('color', 'red');
-		});
-		this.el.addEventListener('endContact', function () {
-			return _this.el.setAttribute('color', 'green');
-		});
-	},
-	tick: function tick() {},
-	pickup: function pickup() {},
-	drop: function drop() {},
-	updateBounds: function updateBounds() {
-		this.bounds.setFromObject(this.el.object3D);
-		this.bounds.applyMatrix4(new THREE.Matrix4().getInverse(this.el.object3D.matrixWorld));
-	}
-});
+var _getIterator = unwrapExports(getIterator);
 
 var _meta = createCommonjsModule(function (module) {
 var META = _uid('meta');
@@ -2875,22 +2533,17 @@ var _collection = function (NAME, wrapper, methods, common, IS_MAP, IS_WEAK) {
   return C;
 };
 
-var MAP = 'Map';
+var SET = 'Set';
 
-// 23.1 Map Objects
-var es6_map = _collection(MAP, function (get) {
-  return function Map() { return get(this, arguments.length > 0 ? arguments[0] : undefined); };
+// 23.2 Set Objects
+var es6_set = _collection(SET, function (get) {
+  return function Set() { return get(this, arguments.length > 0 ? arguments[0] : undefined); };
 }, {
-  // 23.1.3.6 Map.prototype.get(key)
-  get: function get(key) {
-    var entry = _collectionStrong.getEntry(_validateCollection(this, MAP), key);
-    return entry && entry.v;
-  },
-  // 23.1.3.9 Map.prototype.set(key, value)
-  set: function set(key, value) {
-    return _collectionStrong.def(_validateCollection(this, MAP), key === 0 ? 0 : key, value);
+  // 23.2.3.1 Set.prototype.add(value)
+  add: function add(value) {
+    return _collectionStrong.def(_validateCollection(this, SET), value = value === 0 ? 0 : value, value);
   }
-}, _collectionStrong, true);
+}, _collectionStrong);
 
 var _arrayFromIterable = function (iter, ITERATOR) {
   var result = [];
@@ -2911,7 +2564,7 @@ var _collectionToJson = function (NAME) {
 // https://github.com/DavidBruant/Map-Set.prototype.toJSON
 
 
-_export(_export.P + _export.R, 'Map', { toJSON: _collectionToJson('Map') });
+_export(_export.P + _export.R, 'Set', { toJSON: _collectionToJson('Set') });
 
 // https://tc39.github.io/proposal-setmap-offrom/
 
@@ -2919,14 +2572,14 @@ _export(_export.P + _export.R, 'Map', { toJSON: _collectionToJson('Map') });
 var _setCollectionOf = function (COLLECTION) {
   _export(_export.S, COLLECTION, { of: function of() {
     var length = arguments.length;
-    var A = Array(length);
+    var A = new Array(length);
     while (length--) A[length] = arguments[length];
     return new this(A);
   } });
 };
 
-// https://tc39.github.io/proposal-setmap-offrom/#sec-map.of
-_setCollectionOf('Map');
+// https://tc39.github.io/proposal-setmap-offrom/#sec-set.of
+_setCollectionOf('Set');
 
 // https://tc39.github.io/proposal-setmap-offrom/
 
@@ -2955,6 +2608,495 @@ var _setCollectionFrom = function (COLLECTION) {
     return new this(A);
   } });
 };
+
+// https://tc39.github.io/proposal-setmap-offrom/#sec-set.from
+_setCollectionFrom('Set');
+
+var set$1 = _core.Set;
+
+var set = createCommonjsModule(function (module) {
+module.exports = { "default": set$1, __esModule: true };
+});
+
+var _Set = unwrapExports(set);
+
+function loadFile(url) {
+	var loader = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new AFRAME.THREE.FileLoader();
+
+	return new _Promise(function (resolve, reject) {
+		loader.load(url, resolve, function () {}, reject);
+	});
+}
+
+function obj2array(obj, keys) {
+	return keys.map(function (k) {
+		return obj[k];
+	});
+}
+
+function set_difference(a, b) {
+	var diff = new _Set(a);
+	var _iteratorNormalCompletion = true;
+	var _didIteratorError = false;
+	var _iteratorError = undefined;
+
+	try {
+		for (var _iterator = _getIterator(b), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+			var elem = _step.value;
+
+			diff.delete(elem);
+		}
+	} catch (err) {
+		_didIteratorError = true;
+		_iteratorError = err;
+	} finally {
+		try {
+			if (!_iteratorNormalCompletion && _iterator.return) {
+				_iterator.return();
+			}
+		} finally {
+			if (_didIteratorError) {
+				throw _iteratorError;
+			}
+		}
+	}
+
+	return diff;
+}
+
+AFRAME.registerSystem('poly-service', {
+	schema: {
+		key: { type: 'string' }
+	},
+	init: function init() {
+		this.pages = [];
+		this.loader = new AFRAME.THREE.FileLoader();
+		this.query = 'https://poly.googleapis.com/v1/assets/?format=GLTF2&maxComplexity=SIMPLE&pageSize=20&key=' + this.data.key;
+	},
+	getListing: function () {
+		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(page) {
+			var data, json, prevPage, _data, _json;
+
+			return regenerator.wrap(function _callee$(_context) {
+				while (1) {
+					switch (_context.prev = _context.next) {
+						case 0:
+							console.log('attemping grab of page', page);
+
+							if (!(page < 0)) {
+								_context.next = 3;
+								break;
+							}
+
+							throw new Error('Requested page (' + page + ') before beginning');
+
+						case 3:
+							if (!this.pages[page]) {
+								_context.next = 7;
+								break;
+							}
+
+							return _context.abrupt('return', this.pages[page]);
+
+						case 7:
+							if (!(page === 0)) {
+								_context.next = 16;
+								break;
+							}
+
+							_context.next = 10;
+							return loadFile(this.query, this.loader);
+
+						case 10:
+							data = _context.sent;
+							json = JSON.parse(data);
+
+							this.pages.push(json);
+							return _context.abrupt('return', json);
+
+						case 16:
+							prevPage = {};
+							_context.prev = 17;
+							_context.next = 20;
+							return this.getListing(page - 1);
+
+						case 20:
+							prevPage = _context.sent;
+							_context.next = 27;
+							break;
+
+						case 23:
+							_context.prev = 23;
+							_context.t0 = _context['catch'](17);
+
+							console.log(_context.t0.stack);
+							throw new Error('Requested page (' + page + ') past end, no previous page');
+
+						case 27:
+							if (!prevPage.nextPageToken) {
+								_context.next = 36;
+								break;
+							}
+
+							_context.next = 30;
+							return loadFile(this.query + '&pageToken=' + prevPage.nextPageToken, this.loader);
+
+						case 30:
+							_data = _context.sent;
+							_json = JSON.parse(_data);
+
+							this.pages.push(_json);
+							return _context.abrupt('return', _json);
+
+						case 36:
+							throw new Error('Requested page (' + page + ') past end, no page token');
+
+						case 37:
+						case 'end':
+							return _context.stop();
+					}
+				}
+			}, _callee, this, [[17, 23]]);
+		}));
+
+		function getListing(_x) {
+			return _ref.apply(this, arguments);
+		}
+
+		return getListing;
+	}(),
+	fakeGetListing: function () {
+		var _ref2 = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee2(page) {
+			var data;
+			return regenerator.wrap(function _callee2$(_context2) {
+				while (1) {
+					switch (_context2.prev = _context2.next) {
+						case 0:
+							_context2.next = 2;
+							return loadFile('testdata/listing.json', this.loader);
+
+						case 2:
+							data = _context2.sent;
+							return _context2.abrupt('return', JSON.parse(data));
+
+						case 4:
+						case 'end':
+							return _context2.stop();
+					}
+				}
+			}, _callee2, this);
+		}));
+
+		function fakeGetListing(_x2) {
+			return _ref2.apply(this, arguments);
+		}
+
+		return fakeGetListing;
+	}()
+});
+
+AFRAME.registerComponent('avr-visible', {
+	schema: { type: 'boolean', default: false },
+	init: function init() {
+		this.el.addEventListener('model-loaded', this.update.bind(this));
+	},
+	update: function update() {
+		var _this = this;
+
+		console.log('visible update:', this.data);
+		this.el.object3D.traverse(function (o) {
+			return o.visible = _this.data;
+		});
+	}
+});
+
+var scaleFactor = 1.2;
+
+AFRAME.registerComponent('hover-scale', {
+	init: function init() {
+		var _this = this;
+
+		// create animation
+		this.el.setAttribute('animation__hover', {
+			startEvents: ['hoverstart', 'mouseleave'],
+			property: 'scale',
+			dir: 'alternate',
+			easing: 'easeOutQuad',
+			dur: 200
+		});
+
+		// update scale
+		this.el.addEventListener('mouseenter', function () {
+			var smallScale = obj2array(_this.el.getAttribute('scale'), ['x', 'y', 'z']);
+			var bigScale = smallScale.map(function (x) {
+				return x * scaleFactor;
+			});
+			_this.el.setAttribute('animation__hover', { from: smallScale.join(' '), to: bigScale.join(' ') });
+
+			_this.el.emit('hoverstart');
+		});
+	}
+});
+
+AFRAME.registerComponent('maintain-size', {
+	schema: { type: 'vec3' },
+	init: function init() {
+		this.el.addEventListener('model-loaded', this.rescale.bind(this));
+	},
+	rescale: function rescale() {
+		this.el.setAttribute('position', { x: 0, y: 0, z: 0 });
+		this.el.setAttribute('scale', { x: 1, y: 1, z: 1 });
+
+		var box = new AFRAME.THREE.Box3();
+		box.setFromObject(this.el.object3D);
+		var size = box.getSize(),
+		    center = box.getCenter().sub(this.el.object3D.getWorldPosition());
+		var ratio = Math.min(this.data.x / size.x, this.data.y / size.y, this.data.z / size.z);
+
+		this.el.setAttribute('scale', { x: ratio, y: ratio, z: ratio });
+		this.el.setAttribute('position', center.multiplyScalar(-ratio));
+
+		if (this.el.components.collision) this.el.components.collision.updateTransform();
+	}
+});
+
+function getGamepads() {
+	if (!altspace.inClient) return _Promise.reject();
+
+	function getPads(resolve, reject) {
+		console.log('Attempting to get controllers');
+		gamepads = altspace.getGamepads();
+		if (gamepads.length > 0) {
+			console.log('Got controllers');
+			resolve(gamepads.filter(function (g) {
+				return !!g.hand;
+			}));
+		} else {
+			reject();
+		}
+	}
+
+	function waitForFocus(resolve, reject) {
+		var scene = document.querySelector('a-scene');
+		function clearAndResolve() {
+			scene.removeEventListener('click', clearAndResolve);
+			resolve();
+		}
+
+		console.log('waiting for focus');
+		scene.addEventListener('click', clearAndResolve);
+	}
+
+	function getPadsRepeatedly(attemptsRemaining) {
+		return new _Promise(getPads).catch(function () {
+			if (--attemptsRemaining > 0) {
+				return new _Promise(function (resolve, reject) {
+					return setTimeout(resolve, 500);
+				}).then(function () {
+					return getPadsRepeatedly(attemptsRemaining);
+				});
+			} else console.log('Failed to get controllers');
+		});
+	}
+
+	return new _Promise(getPads).catch(function () {
+		return new _Promise(waitForFocus);
+	}).then(function () {
+		return getPadsRepeatedly(20);
+	});
+}
+
+var gamepads = [];
+var gamepadsPromise = null;
+
+AFRAME.registerComponent('altspace-controls', {
+	schema: { default: 'right' },
+	init: function () {
+		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee() {
+			var _this = this;
+
+			var pads;
+			return regenerator.wrap(function _callee$(_context) {
+				while (1) {
+					switch (_context.prev = _context.next) {
+						case 0:
+							this.gamepad = null;
+							this.parentInverse = new THREE.Matrix4().getInverse(this.el.parentElement.object3D.matrixWorld);
+							if (!gamepadsPromise) gamepadsPromise = getGamepads();
+
+							if (!(gamepads.length > 0)) {
+								_context.next = 7;
+								break;
+							}
+
+							_context.t0 = gamepads;
+							_context.next = 10;
+							break;
+
+						case 7:
+							_context.next = 9;
+							return gamepadsPromise;
+
+						case 9:
+							_context.t0 = _context.sent;
+
+						case 10:
+							pads = _context.t0;
+
+							this.gamepad = pads.filter(function (p) {
+								return p.hand === _this.data;
+							})[0];
+							if (!this.gamepad) {
+								console.log('No ' + this.data + '-hand controller found');
+							}
+
+						case 13:
+						case 'end':
+							return _context.stop();
+					}
+				}
+			}, _callee, this);
+		}));
+
+		function init() {
+			return _ref.apply(this, arguments);
+		}
+
+		return init;
+	}(),
+	tick: function tick() {
+		if (!this.gamepad) return;
+
+		this.el.object3D.position.copy(this.gamepad.position).applyMatrix4(this.parentInverse);
+		this.el.object3D.quaternion.copy(this.gamepad.rotation);
+
+		if (!this.gripState && this.gamepad.buttons[1].pressed) {
+			this.gripState = true;
+			this.el.emit('gripdown', this.el, false);
+		} else if (this.gripState && !this.gamepad.buttons[1].pressed) {
+			this.gripState = false;
+			this.el.emit('gripup', this.el, false);
+		}
+	}
+});
+
+AFRAME.registerComponent('grabbable', {
+	init: function init() {
+		this._hoverStart = this.hoverStart.bind(this);
+		this._pickup = this.pickup.bind(this);
+		this._drop = this.drop.bind(this);
+		this._hoverEnd = this.hoverEnd.bind(this);
+
+		this.el.addEventListener('collision-start', this._hoverStart);
+		this.el.addEventListener('collision-end', this._hoverEnd);
+	},
+	hoverStart: function hoverStart() {
+		this.el.object3DMap.mesh.traverse(function (obj) {
+			if (obj.material) {
+				obj.material.color.set('gray');
+			}
+		});
+	},
+	pickup: function pickup() {},
+	drop: function drop() {},
+	hoverEnd: function hoverEnd() {
+		this.el.object3DMap.mesh.traverse(function (obj) {
+			if (obj.material) {
+				obj.material.color.set('white');
+			}
+		});
+	}
+});
+
+var _createProperty = function (object, index, value) {
+  if (index in object) _objectDp.f(object, index, _propertyDesc(0, value));
+  else object[index] = value;
+};
+
+_export(_export.S + _export.F * !_iterDetect(function (iter) {  }), 'Array', {
+  // 22.1.2.1 Array.from(arrayLike, mapfn = undefined, thisArg = undefined)
+  from: function from(arrayLike /* , mapfn = undefined, thisArg = undefined */) {
+    var O = _toObject(arrayLike);
+    var C = typeof this == 'function' ? this : Array;
+    var aLen = arguments.length;
+    var mapfn = aLen > 1 ? arguments[1] : undefined;
+    var mapping = mapfn !== undefined;
+    var index = 0;
+    var iterFn = core_getIteratorMethod(O);
+    var length, result, step, iterator;
+    if (mapping) mapfn = _ctx(mapfn, aLen > 2 ? arguments[2] : undefined, 2);
+    // if object isn't iterable or it's array with default iterator - use simple case
+    if (iterFn != undefined && !(C == Array && _isArrayIter(iterFn))) {
+      for (iterator = iterFn.call(O), result = new C(); !(step = iterator.next()).done; index++) {
+        _createProperty(result, index, mapping ? _iterCall(iterator, mapfn, [step.value, index], true) : step.value);
+      }
+    } else {
+      length = _toLength(O.length);
+      for (result = new C(length); length > index; index++) {
+        _createProperty(result, index, mapping ? mapfn(O[index], index) : O[index]);
+      }
+    }
+    result.length = index;
+    return result;
+  }
+});
+
+var from$3 = _core.Array.from;
+
+var from$1 = createCommonjsModule(function (module) {
+module.exports = { "default": from$3, __esModule: true };
+});
+
+unwrapExports(from$1);
+
+var toConsumableArray = createCommonjsModule(function (module, exports) {
+exports.__esModule = true;
+
+
+
+var _from2 = _interopRequireDefault(from$1);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = function (arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) {
+      arr2[i] = arr[i];
+    }
+
+    return arr2;
+  } else {
+    return (0, _from2.default)(arr);
+  }
+};
+});
+
+var _toConsumableArray = unwrapExports(toConsumableArray);
+
+var MAP = 'Map';
+
+// 23.1 Map Objects
+var es6_map = _collection(MAP, function (get) {
+  return function Map() { return get(this, arguments.length > 0 ? arguments[0] : undefined); };
+}, {
+  // 23.1.3.6 Map.prototype.get(key)
+  get: function get(key) {
+    var entry = _collectionStrong.getEntry(_validateCollection(this, MAP), key);
+    return entry && entry.v;
+  },
+  // 23.1.3.9 Map.prototype.set(key, value)
+  set: function set(key, value) {
+    return _collectionStrong.def(_validateCollection(this, MAP), key === 0 ? 0 : key, value);
+  }
+}, _collectionStrong, true);
+
+// https://github.com/DavidBruant/Map-Set.prototype.toJSON
+
+
+_export(_export.P + _export.R, 'Map', { toJSON: _collectionToJson('Map') });
+
+// https://tc39.github.io/proposal-setmap-offrom/#sec-map.of
+_setCollectionOf('Map');
 
 // https://tc39.github.io/proposal-setmap-offrom/#sec-map.from
 _setCollectionFrom('Map');
@@ -3059,10 +3201,340 @@ var DoubleMap = function () {
 		value: function forEach(fn) {
 			return this.bToA.forEach(fn);
 		}
+	}, {
+		key: "deleteA",
+		value: function deleteA(a) {
+			if (!this.aToB.get(a)) return;
+			this.bToA.delete(this.aToB.get(a));
+			this.aToB.delete(a);
+		}
+	}, {
+		key: "deleteB",
+		value: function deleteB(b) {
+			if (!this.bToA.get(b)) return;
+			this.aToB.delete(this.bToA.get(b));
+			this.bToA.delete(b);
+		}
 	}]);
 
 	return DoubleMap;
 }();
+
+var _global$2 = createCommonjsModule(function (module) {
+// https://github.com/zloirock/core-js/issues/86#issuecomment-115759028
+var global = module.exports = typeof window != 'undefined' && window.Math == Math
+  ? window : typeof self != 'undefined' && self.Math == Math ? self
+  // eslint-disable-next-line no-new-func
+  : Function('return this')();
+if (typeof __g == 'number') __g = global; // eslint-disable-line no-undef
+});
+
+var _core$2 = createCommonjsModule(function (module) {
+var core = module.exports = { version: '2.5.3' };
+if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
+});
+
+var _core_1$1 = _core$2.version;
+
+var _isObject$2 = function (it) {
+  return typeof it === 'object' ? it !== null : typeof it === 'function';
+};
+
+var _anObject$2 = function (it) {
+  if (!_isObject$2(it)) throw TypeError(it + ' is not an object!');
+  return it;
+};
+
+var _fails$2 = function (exec) {
+  try {
+    return !!exec();
+  } catch (e) {
+    return true;
+  }
+};
+
+// Thank's IE8 for his funny defineProperty
+var _descriptors$2 = !_fails$2(function () {
+  return Object.defineProperty({}, 'a', { get: function () { return 7; } }).a != 7;
+});
+
+var document$3 = _global$2.document;
+// typeof document.createElement is 'object' in old IE
+var is$1 = _isObject$2(document$3) && _isObject$2(document$3.createElement);
+var _domCreate$2 = function (it) {
+  return is$1 ? document$3.createElement(it) : {};
+};
+
+var _ie8DomDefine$2 = !_descriptors$2 && !_fails$2(function () {
+  return Object.defineProperty(_domCreate$2('div'), 'a', { get: function () { return 7; } }).a != 7;
+});
+
+// 7.1.1 ToPrimitive(input [, PreferredType])
+
+// instead of the ES6 spec version, we didn't implement @@toPrimitive case
+// and the second argument - flag - preferred type is a string
+var _toPrimitive$2 = function (it, S) {
+  if (!_isObject$2(it)) return it;
+  var fn, val;
+  if (S && typeof (fn = it.toString) == 'function' && !_isObject$2(val = fn.call(it))) return val;
+  if (typeof (fn = it.valueOf) == 'function' && !_isObject$2(val = fn.call(it))) return val;
+  if (!S && typeof (fn = it.toString) == 'function' && !_isObject$2(val = fn.call(it))) return val;
+  throw TypeError("Can't convert object to primitive value");
+};
+
+var dP$3 = Object.defineProperty;
+
+var f$2 = _descriptors$2 ? Object.defineProperty : function defineProperty(O, P, Attributes) {
+  _anObject$2(O);
+  P = _toPrimitive$2(P, true);
+  _anObject$2(Attributes);
+  if (_ie8DomDefine$2) try {
+    return dP$3(O, P, Attributes);
+  } catch (e) { /* empty */ }
+  if ('get' in Attributes || 'set' in Attributes) throw TypeError('Accessors not supported!');
+  if ('value' in Attributes) O[P] = Attributes.value;
+  return O;
+};
+
+var _objectDp$2 = {
+	f: f$2
+};
+
+var _propertyDesc$2 = function (bitmap, value) {
+  return {
+    enumerable: !(bitmap & 1),
+    configurable: !(bitmap & 2),
+    writable: !(bitmap & 4),
+    value: value
+  };
+};
+
+var _hide$2 = _descriptors$2 ? function (object, key, value) {
+  return _objectDp$2.f(object, key, _propertyDesc$2(1, value));
+} : function (object, key, value) {
+  object[key] = value;
+  return object;
+};
+
+var hasOwnProperty$1 = {}.hasOwnProperty;
+var _has$2 = function (it, key) {
+  return hasOwnProperty$1.call(it, key);
+};
+
+var id$1 = 0;
+var px$1 = Math.random();
+var _uid$2 = function (key) {
+  return 'Symbol('.concat(key === undefined ? '' : key, ')_', (++id$1 + px$1).toString(36));
+};
+
+var _redefine$2 = createCommonjsModule(function (module) {
+var SRC = _uid$2('src');
+var TO_STRING = 'toString';
+var $toString = Function[TO_STRING];
+var TPL = ('' + $toString).split(TO_STRING);
+
+_core$2.inspectSource = function (it) {
+  return $toString.call(it);
+};
+
+(module.exports = function (O, key, val, safe) {
+  var isFunction = typeof val == 'function';
+  if (isFunction) _has$2(val, 'name') || _hide$2(val, 'name', key);
+  if (O[key] === val) return;
+  if (isFunction) _has$2(val, SRC) || _hide$2(val, SRC, O[key] ? '' + O[key] : TPL.join(String(key)));
+  if (O === _global$2) {
+    O[key] = val;
+  } else if (!safe) {
+    delete O[key];
+    _hide$2(O, key, val);
+  } else if (O[key]) {
+    O[key] = val;
+  } else {
+    _hide$2(O, key, val);
+  }
+// add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
+})(Function.prototype, TO_STRING, function toString() {
+  return typeof this == 'function' && this[SRC] || $toString.call(this);
+});
+});
+
+var _aFunction$2 = function (it) {
+  if (typeof it != 'function') throw TypeError(it + ' is not a function!');
+  return it;
+};
+
+// optional / simple context binding
+
+var _ctx$2 = function (fn, that, length) {
+  _aFunction$2(fn);
+  if (that === undefined) return fn;
+  switch (length) {
+    case 1: return function (a) {
+      return fn.call(that, a);
+    };
+    case 2: return function (a, b) {
+      return fn.call(that, a, b);
+    };
+    case 3: return function (a, b, c) {
+      return fn.call(that, a, b, c);
+    };
+  }
+  return function (/* ...args */) {
+    return fn.apply(that, arguments);
+  };
+};
+
+var PROTOTYPE$2 = 'prototype';
+
+var $export$2 = function (type, name, source) {
+  var IS_FORCED = type & $export$2.F;
+  var IS_GLOBAL = type & $export$2.G;
+  var IS_STATIC = type & $export$2.S;
+  var IS_PROTO = type & $export$2.P;
+  var IS_BIND = type & $export$2.B;
+  var target = IS_GLOBAL ? _global$2 : IS_STATIC ? _global$2[name] || (_global$2[name] = {}) : (_global$2[name] || {})[PROTOTYPE$2];
+  var exports = IS_GLOBAL ? _core$2 : _core$2[name] || (_core$2[name] = {});
+  var expProto = exports[PROTOTYPE$2] || (exports[PROTOTYPE$2] = {});
+  var key, own, out, exp;
+  if (IS_GLOBAL) source = name;
+  for (key in source) {
+    // contains in native
+    own = !IS_FORCED && target && target[key] !== undefined;
+    // export native or passed
+    out = (own ? target : source)[key];
+    // bind timers to global for call from export context
+    exp = IS_BIND && own ? _ctx$2(out, _global$2) : IS_PROTO && typeof out == 'function' ? _ctx$2(Function.call, out) : out;
+    // extend global
+    if (target) _redefine$2(target, key, out, type & $export$2.U);
+    // export
+    if (exports[key] != out) _hide$2(exports, key, exp);
+    if (IS_PROTO && expProto[key] != out) expProto[key] = out;
+  }
+};
+_global$2.core = _core$2;
+// type bitmap
+$export$2.F = 1;   // forced
+$export$2.G = 2;   // global
+$export$2.S = 4;   // static
+$export$2.P = 8;   // proto
+$export$2.B = 16;  // bind
+$export$2.W = 32;  // wrap
+$export$2.U = 64;  // safe
+$export$2.R = 128; // real proto method for `library`
+var _export$2 = $export$2;
+
+var toString$1 = {}.toString;
+
+var _cof$2 = function (it) {
+  return toString$1.call(it).slice(8, -1);
+};
+
+// fallback for non-array-like ES3 and non-enumerable old V8 strings
+
+// eslint-disable-next-line no-prototype-builtins
+var _iobject$2 = Object('z').propertyIsEnumerable(0) ? Object : function (it) {
+  return _cof$2(it) == 'String' ? it.split('') : Object(it);
+};
+
+// 7.2.1 RequireObjectCoercible(argument)
+var _defined$2 = function (it) {
+  if (it == undefined) throw TypeError("Can't call method on  " + it);
+  return it;
+};
+
+// to indexed object, toObject with fallback for non-array-like ES3 strings
+
+
+var _toIobject$2 = function (it) {
+  return _iobject$2(_defined$2(it));
+};
+
+// 7.1.4 ToInteger
+var ceil$1 = Math.ceil;
+var floor$1 = Math.floor;
+var _toInteger$2 = function (it) {
+  return isNaN(it = +it) ? 0 : (it > 0 ? floor$1 : ceil$1)(it);
+};
+
+// 7.1.15 ToLength
+
+var min$2 = Math.min;
+var _toLength$2 = function (it) {
+  return it > 0 ? min$2(_toInteger$2(it), 0x1fffffffffffff) : 0; // pow(2, 53) - 1 == 9007199254740991
+};
+
+var max$1 = Math.max;
+var min$3 = Math.min;
+var _toAbsoluteIndex$2 = function (index, length) {
+  index = _toInteger$2(index);
+  return index < 0 ? max$1(index + length, 0) : min$3(index, length);
+};
+
+// false -> Array#indexOf
+// true  -> Array#includes
+
+
+
+var _arrayIncludes$2 = function (IS_INCLUDES) {
+  return function ($this, el, fromIndex) {
+    var O = _toIobject$2($this);
+    var length = _toLength$2(O.length);
+    var index = _toAbsoluteIndex$2(fromIndex, length);
+    var value;
+    // Array#includes uses SameValueZero equality algorithm
+    // eslint-disable-next-line no-self-compare
+    if (IS_INCLUDES && el != el) while (length > index) {
+      value = O[index++];
+      // eslint-disable-next-line no-self-compare
+      if (value != value) return true;
+    // Array#indexOf ignores holes, Array#includes - not
+    } else for (;length > index; index++) if (IS_INCLUDES || index in O) {
+      if (O[index] === el) return IS_INCLUDES || index || 0;
+    } return !IS_INCLUDES && -1;
+  };
+};
+
+var SHARED$1 = '__core-js_shared__';
+var store$1 = _global$2[SHARED$1] || (_global$2[SHARED$1] = {});
+var _shared$2 = function (key) {
+  return store$1[key] || (store$1[key] = {});
+};
+
+var _wks$2 = createCommonjsModule(function (module) {
+var store = _shared$2('wks');
+
+var Symbol = _global$2.Symbol;
+var USE_SYMBOL = typeof Symbol == 'function';
+
+var $exports = module.exports = function (name) {
+  return store[name] || (store[name] =
+    USE_SYMBOL && Symbol[name] || (USE_SYMBOL ? Symbol : _uid$2)('Symbol.' + name));
+};
+
+$exports.store = store;
+});
+
+// 22.1.3.31 Array.prototype[@@unscopables]
+var UNSCOPABLES = _wks$2('unscopables');
+var ArrayProto$1 = Array.prototype;
+if (ArrayProto$1[UNSCOPABLES] == undefined) _hide$2(ArrayProto$1, UNSCOPABLES, {});
+var _addToUnscopables$2 = function (key) {
+  ArrayProto$1[UNSCOPABLES][key] = true;
+};
+
+// https://github.com/tc39/Array.prototype.includes
+
+var $includes = _arrayIncludes$2(true);
+
+_export$2(_export$2.P, 'Array', {
+  includes: function includes(el /* , fromIndex = 0 */) {
+    return $includes(this, el, arguments.length > 1 ? arguments[1] : undefined);
+  }
+});
+
+_addToUnscopables$2('includes');
+
+var includes = _core$2.Array.includes;
 
 /* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
 
@@ -3073,21 +3545,22 @@ AFRAME.registerSystem('collision', {
 		// entity mapping
 		this.el2co = new DoubleMap();
 		this.el2localBounds = new _Map();
-		this._regQueue = [];
-		this._step = 0;
+		this.regQueue = [];
+		this.manifolds = new _Set();
+		this.forceUpdateObjects = new _Set();
+		this._debugMeshes = new _Map();
 
 		// ammo setup
 		Ammo().then(function () {
 			var collisionConfig = new Ammo.btDefaultCollisionConfiguration();
 			var dispatcher = new Ammo.btCollisionDispatcher(collisionConfig);
-			var solver = new Ammo.btSequentialImpulseConstraintSolver();
-			var broadphase = new Ammo.btDbvtBroadphase();
-			_this.world = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfig);
+			var broadphase = new Ammo.btAxisSweep3(new Ammo.btVector3(-100, -100, -100), new Ammo.btVector3(100, 100, 100));
+			_this.world = new Ammo.btCollisionWorld(dispatcher, broadphase, collisionConfig);
 
-			_this._regQueue.forEach(function (el) {
+			_this.regQueue.forEach(function (el) {
 				return _this.registerCollisionBody(el);
 			});
-			_this._regQueue = null;
+			_this.regQueue = null;
 		});
 	},
 
@@ -3096,9 +3569,9 @@ AFRAME.registerSystem('collision', {
 
 		if (!this.world) return;
 
-		// update dynamic object transforms
+		// update object transforms
 		this.el2co.forEach(function (el, co) {
-			if (!el.getAttribute('collision').kinematic) {
+			if (!_this2.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic) {
 				return;
 			}
 
@@ -3109,32 +3582,119 @@ AFRAME.registerSystem('collision', {
 			var transform = co.getWorldTransform();
 			var shape = co.getCollisionShape();
 
+			if (el.id === 'spawn') {
+				console.log(worldPos, worldRot, new THREE.Vector3().multiplyVectors(worldScale, localBounds.getSize()));
+			}
 			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
 			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
 			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+
+			_this2.forceUpdateObjects.delete(el);
+
+			if (_this2.el.sceneEl.components.debug && _this2._debugMeshes.has(el)) {
+				var mesh = _this2._debugMeshes.get(el);
+				console.log(mesh);
+				mesh.position.copy(worldPos);
+				mesh.quaternion.copy(worldRot);
+				mesh.scale.copy(worldScale);
+			}
 		});
 
-		this.world.stepSimulation(this._step++);
+		// update collision list
+		this.world.performDiscreteCollisionDetection();
 
+		// get list of intersecting objects
 		var dispatcher = this.world.getDispatcher();
 		var hitCount = dispatcher.getNumManifolds();
+		var hits = new _Set();
 		for (var i = 0; i < hitCount; i++) {
 			var manifold = dispatcher.getManifoldByIndexInternal(i);
-			var co1 = manifold.getBody0(),
-			    co2 = manifold.getBody1();
-			var el1 = this.el2co.getA(co1),
-			    el2 = this.el2co.getA(co2);
-			if (el1.getAttribute('collision').with.includes(el2) && el2.getAttribute('collision').with.includes(el1)) {
-				console.log('fire event!');
-				//el2.dispatchEvent('collision-start', el1, false);
-				//el1.dispatchEvent('collision-start', el2, false);
+			hits.add(manifold);
+		}
+
+		// detect collision-start
+		var newHits = set_difference(hits, this.manifolds);
+		var _iteratorNormalCompletion = true;
+		var _didIteratorError = false;
+		var _iteratorError = undefined;
+
+		try {
+			for (var _iterator = _getIterator(newHits), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+				var _manifold = _step.value;
+
+				var co1 = _manifold.getBody0(),
+				    co2 = _manifold.getBody1();
+				var el1 = this.el2co.getA(co1),
+				    el2 = this.el2co.getA(co2);
+				var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
+				    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
+				if (el1targets.includes(el2) && el2targets.includes(el1)) {
+					console.log('collision start');
+					el2.emit('collision-start', el1, false);
+					el1.emit('collision-start', el2, false);
+				}
+			}
+
+			// detect collision-end
+		} catch (err) {
+			_didIteratorError = true;
+			_iteratorError = err;
+		} finally {
+			try {
+				if (!_iteratorNormalCompletion && _iterator.return) {
+					_iterator.return();
+				}
+			} finally {
+				if (_didIteratorError) {
+					throw _iteratorError;
+				}
 			}
 		}
+
+		var oldHits = set_difference(this.manifolds, hits);
+		var _iteratorNormalCompletion2 = true;
+		var _didIteratorError2 = false;
+		var _iteratorError2 = undefined;
+
+		try {
+			for (var _iterator2 = _getIterator(oldHits), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+				var _manifold2 = _step2.value;
+
+				var co1 = _manifold2.getBody0(),
+				    co2 = _manifold2.getBody1();
+				var el1 = this.el2co.getA(co1),
+				    el2 = this.el2co.getA(co2);
+				var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
+				    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
+				if (el1targets.includes(el2) && el2targets.includes(el1)) {
+					console.log('collision end');
+					el2.emit('collision-end', el1, false);
+					el1.emit('collision-end', el2, false);
+				}
+			}
+
+			// remember last frame's collisions
+		} catch (err) {
+			_didIteratorError2 = true;
+			_iteratorError2 = err;
+		} finally {
+			try {
+				if (!_iteratorNormalCompletion2 && _iterator2.return) {
+					_iterator2.return();
+				}
+			} finally {
+				if (_didIteratorError2) {
+					throw _iteratorError2;
+				}
+			}
+		}
+
+		this.manifolds = hits;
 	},
 
 	registerCollisionBody: function registerCollisionBody(el) {
 		if (!this.world) {
-			this._regQueue.push(el);
+			this.regQueue.push(el);
 			return;
 		}
 
@@ -3147,14 +3707,30 @@ AFRAME.registerSystem('collision', {
 
 		// create shape
 		var size = bounds.getSize();
-		var halfExtants = new Ammo.btVector3(size.x, size.y, size.z);
-		var shape = new Ammo.btBoxShape(halfExtants);
-		var co = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(1, null, shape));
+		var halfExtants = new Ammo.btVector3(size.x / 2, size.y / 2, size.z / 2);
+		var co = new Ammo.btCollisionObject();
+		co.setCollisionShape(new Ammo.btBoxShape(halfExtants));
 		this.el2co.set(el, co);
 
 		this.world.addCollisionObject(co);
+
+		// create debug mesh
+		if (this.el.sceneEl.components.debug) {
+			var mesh = new THREE.Mesh(new THREE.BoxBufferGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ color: 'magenta', transparent: true, opacity: .2 }));
+			this._debugMeshes.set(el, mesh);
+			this.el.sceneEl.object3D.add(mesh);
+		}
 	},
-	removeCollisionBody: function removeCollisionBody(el) {},
+	removeCollisionBody: function removeCollisionBody(el) {
+		var co = this.el2co.getB(el);
+		this.world.removeCollisionObject(co);
+		this.el2co.deleteA(el);
+
+		if (this.el.sceneEl.components.debug) {
+			this.el.sceneEl.object3D.remove(this._debugMeshes.get(el));
+			this._debugMeshes.delete(el);
+		}
+	},
 	isRegistered: function isRegistered(el) {
 		return !!this.el2co.getB(el);
 	}
@@ -3172,9 +3748,27 @@ AFRAME.registerComponent('collision', {
 	updateBounds: function updateBounds() {
 		if (this.system.isRegistered(this.el)) this.system.removeCollisionBody(this.el);
 		this.system.registerCollisionBody(this.el);
+		this.updateTransform();
+	},
+	updateTransform: function updateTransform() {
+		this.system.forceUpdateObjects.add(this.el);
 	},
 	remove: function remove() {
 		this.system.removeCollisionBody(this.el);
+	}
+});
+
+AFRAME.registerComponent('grab-indicator', {
+	init: function init() {
+		var _this = this;
+
+		this.el.setAttribute('color', 'white');
+		this.el.addEventListener('collision-start', function () {
+			_this.el.setAttribute('color', 'yellow');
+		});
+		this.el.addEventListener('collision-end', function () {
+			_this.el.setAttribute('color', 'white');
+		});
 	}
 });
 

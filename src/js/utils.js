@@ -26,4 +26,13 @@ function obj2array(obj, keys)
 	return keys.map(k => obj[k]);
 }
 
-export {loadFile, mapProperties, setAttributes, obj2array}
+function set_difference(a, b)
+{
+	let diff = new Set(a);
+	for(let elem of b){
+		diff.delete(elem);
+	}
+	return diff;
+}
+
+export {loadFile, mapProperties, setAttributes, obj2array, set_difference}

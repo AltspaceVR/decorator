@@ -16,5 +16,8 @@ AFRAME.registerComponent('maintain-size', {
 		
 		this.el.setAttribute('scale', {x: ratio, y: ratio, z: ratio});
 		this.el.setAttribute('position', center.multiplyScalar(-ratio));
+
+		if(this.el.components.collision)
+			this.el.components.collision.updateTransform();
 	}
 });

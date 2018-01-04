@@ -1,21 +1,21 @@
 AFRAME.registerComponent('grabbable', {
-	schema: {
-		by: {type: 'selectorAll'}
-	},
 	init: function()
 	{
-		this.bounds = new AFRAME.THREE.Box3();
-		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
-
+		this._hoverStart = this.hoverStart.bind(this);
 		this._pickup = this.pickup.bind(this);
 		this._drop = this.drop.bind(this);
+		this._hoverEnd = this.hoverEnd.bind(this);
 
-		this.el.addEventListener('beginContact', () => this.el.setAttribute('color', 'red'));
-		this.el.addEventListener('endContact', () => this.el.setAttribute('color', 'green'));
+		this.el.addEventListener('collision-start', this._hoverStart);
+		this.el.addEventListener('collision-end', this._hoverEnd);
 	},
-	tick: function()
+	hoverStart: function()
 	{
-
+		this.el.object3DMap.mesh.traverse(obj => {
+			if(obj.material){
+				obj.material.color.set('gray');
+			}
+		});
 	},
 	pickup: function()
 	{
@@ -25,8 +25,12 @@ AFRAME.registerComponent('grabbable', {
 	{
 
 	},
-	updateBounds: function(){
-		this.bounds.setFromObject(this.el.object3D);
-		this.bounds.applyMatrix4(new THREE.Matrix4().getInverse(this.el.object3D.matrixWorld));
+	hoverEnd: function()
+	{
+		this.el.object3DMap.mesh.traverse(obj => {
+			if(obj.material){
+				obj.material.color.set('white');
+			}
+		});
 	}
 });
