@@ -35,6 +35,7 @@ AFRAME.registerSystem('collision',
 	{
 		if(!this.world) return;
 
+		try {
 		// update object transforms
 		this.el2co.forEach((el, co) => 
 		{
@@ -42,16 +43,20 @@ AFRAME.registerSystem('collision',
 				return;
 			}
 
+			el.object3D.updateMatrixWorld(true);
 			let localBounds = this.el2localBounds.get(el);
 			let worldPos = el.object3D.localToWorld(localBounds.getCenter());
 			let worldRot = el.object3D.getWorldQuaternion();
 			let worldScale = el.object3D.getWorldScale();
 			let transform = co.getWorldTransform();
 			let shape = co.getCollisionShape();
+			/*if(el.id === 'spawn'){
+				console.log('transform update');
+				console.log('local center:', localBounds.getCenter().toArray());
+				console.log('world center:', worldPos.toArray());
+				console.log('object root:', el.object3D.getWorldPosition().toArray());
+			}*/
 
-			if(el.id === 'spawn'){
-				console.log(worldPos, worldRot, new THREE.Vector3().multiplyVectors(worldScale, localBounds.getSize()));
-			}
 			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
 			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
 			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
@@ -60,7 +65,6 @@ AFRAME.registerSystem('collision',
 
 			if(this.el.sceneEl.components.debug && this._debugMeshes.has(el)){
 				let mesh = this._debugMeshes.get(el);
-				console.log(mesh);
 				mesh.position.copy(worldPos);
 				mesh.quaternion.copy(worldRot);
 				mesh.scale.copy(worldScale);
@@ -85,6 +89,8 @@ AFRAME.registerSystem('collision',
 		{
 			let co1 = manifold.getBody0(), co2 = manifold.getBody1();
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
+			if(!el1 || !el2) continue;
+
 			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
@@ -100,6 +106,8 @@ AFRAME.registerSystem('collision',
 		{
 			let co1 = manifold.getBody0(), co2 = manifold.getBody1();
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
+			if(!el1 || !el2) continue;
+
 			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
@@ -111,6 +119,11 @@ AFRAME.registerSystem('collision',
 
 		// remember last frame's collisions
 		this.manifolds = hits;
+		}
+		catch(e){
+			console.error('collision error', e.stack);
+			throw e;
+		}
 	},
 
 	registerCollisionBody(el)
@@ -161,6 +174,10 @@ AFRAME.registerSystem('collision',
 
 	isRegistered(el){
 		return !!this.el2co.getB(el);
+	},
+
+	forceUpdateTransform(el){
+		this.forceUpdateObjects.add(el);
 	}
 });
 
@@ -174,14 +191,21 @@ AFRAME.registerComponent('collision', {
 			this.updateBounds();
 		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
 	},
+	update: function(oldData){
+		// one last late update when kinematic stops
+		if(oldData.kinematic && !this.data.kinematic)
+			this.system.forceUpdateTransform(this.el);
+	},
 	updateBounds: function(){
+		//if(this.el.id === 'spawn') console.log('updateBounds');
 		if(this.system.isRegistered(this.el))
 			this.system.removeCollisionBody(this.el);
 		this.system.registerCollisionBody(this.el);
 		this.updateTransform();
 	},
 	updateTransform: function(){
-		this.system.forceUpdateObjects.add(this.el);
+		//if(this.el.id === 'spawn') console.log('updateTransform');
+		this.system.forceUpdateTransform(this.el);
 	},
 	remove: function(){
 		this.system.removeCollisionBody(this.el);

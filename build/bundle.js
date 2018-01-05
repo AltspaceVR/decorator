@@ -2012,8 +2012,6 @@ AFRAME.registerComponent('place-for-space', {
 	},
 	init: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee() {
-			var _this = this;
-
 			var space, index;
 			return regenerator.wrap(function _callee$(_context) {
 				while (1) {
@@ -2046,14 +2044,8 @@ AFRAME.registerComponent('place-for-space', {
 							} else {
 								this.el.setAttribute('mixin', this.data.otherwise);
 							}
-							setTimeout(function () {
-								Array.prototype.slice.call(_this.el.querySelectorAll('[collision]')).forEach(function (el) {
-									console.log('updating xfrm of ' + el.id);
-									el.components.collision.updateTransform();
-								});
-							}, 0);
 
-						case 12:
+						case 11:
 						case 'end':
 							return _context.stop();
 					}
@@ -2856,7 +2848,10 @@ AFRAME.registerComponent('maintain-size', {
 		this.el.setAttribute('scale', { x: ratio, y: ratio, z: ratio });
 		this.el.setAttribute('position', center.multiplyScalar(-ratio));
 
-		if (this.el.components.collision) this.el.components.collision.updateTransform();
+		if (this.el.components.collision) {
+			this.el.components.collision.updateTransform();
+			//if(this.el.id === 'spawn') console.log('rescale');
+		}
 	}
 });
 
@@ -2981,30 +2976,70 @@ AFRAME.registerComponent('altspace-controls', {
 });
 
 AFRAME.registerComponent('grabbable', {
+	schema: {
+		enabled: { default: true },
+		dropTarget: { type: 'selector', default: '#decorations' }
+	},
 	init: function init() {
 		this._hoverStart = this.hoverStart.bind(this);
 		this._pickup = this.pickup.bind(this);
 		this._drop = this.drop.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 
-		this.el.addEventListener('collision-start', this._hoverStart);
-		this.el.addEventListener('collision-end', this._hoverEnd);
+		if (this.el.dataset.spawned) {
+			this.el.parentElement.addEventListener('gripup', this._drop);
+			this.el.removeAttribute('data-spawned');
+		}
 	},
-	hoverStart: function hoverStart() {
-		this.el.object3DMap.mesh.traverse(function (obj) {
-			if (obj.material) {
-				obj.material.color.set('gray');
-			}
-		});
+	update: function update() {
+		if (this.data.enabled) {
+			this.el.addEventListener('collision-start', this._hoverStart);
+			this.el.addEventListener('collision-end', this._hoverEnd);
+		} else {
+			this.el.removeEventListener('collision-start', this._hoverStart);
+			this.el.removeEventListener('collision-end', this._hoverEnd);
+		}
 	},
-	pickup: function pickup() {},
-	drop: function drop() {},
-	hoverEnd: function hoverEnd() {
-		this.el.object3DMap.mesh.traverse(function (obj) {
-			if (obj.material) {
-				obj.material.color.set('white');
-			}
-		});
+	hoverStart: function hoverStart(_ref) {
+		var hand = _ref.detail;
+
+		hand.addEventListener('gripdown', this._pickup);
+	},
+	pickup: function pickup(_ref2) {
+		var hand = _ref2.detail;
+
+
+		this.el.addEventListener('gripup', this._drop);
+	},
+	drop: function drop(_ref3) {
+		var hand = _ref3.detail;
+
+		// set transform
+		this.el.object3D.updateMatrixWorld(true);
+		console.log('held local pos:', this.el.object3D.position.toArray());
+		console.log('held world pos:', this.el.object3D.getWorldPosition().toArray());
+		var mat = new AFRAME.THREE.Matrix4().getInverse(this.data.dropTarget.object3D.matrixWorld).multiply(this.el.object3D.matrixWorld);
+
+		var pos = new AFRAME.THREE.Vector3(),
+		    quat = new AFRAME.THREE.Quaternion(),
+		    scale = new AFRAME.THREE.Vector3();
+		mat.decompose(pos, quat, scale);
+		var rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
+
+		console.log('dropped local pos:', pos.toArray());
+
+		this.el.setAttribute('position', pos);
+		this.el.setAttribute('rotation', rot);
+		this.el.setAttribute('scale', scale);
+
+		this.data.dropTarget.appendChild(this.el);
+		this.el.setAttribute('collision', 'kinematic', false);
+		console.log('drop finished');
+	},
+	hoverEnd: function hoverEnd(_ref4) {
+		var hand = _ref4.detail;
+
+		hand.removeEventListener('gripdown', this._pickup);
 	}
 });
 
@@ -3569,127 +3604,139 @@ AFRAME.registerSystem('collision', {
 
 		if (!this.world) return;
 
-		// update object transforms
-		this.el2co.forEach(function (el, co) {
-			if (!_this2.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic) {
-				return;
-			}
-
-			var localBounds = _this2.el2localBounds.get(el);
-			var worldPos = el.object3D.localToWorld(localBounds.getCenter());
-			var worldRot = el.object3D.getWorldQuaternion();
-			var worldScale = el.object3D.getWorldScale();
-			var transform = co.getWorldTransform();
-			var shape = co.getCollisionShape();
-
-			if (el.id === 'spawn') {
-				console.log(worldPos, worldRot, new THREE.Vector3().multiplyVectors(worldScale, localBounds.getSize()));
-			}
-			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
-			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
-			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
-
-			_this2.forceUpdateObjects.delete(el);
-
-			if (_this2.el.sceneEl.components.debug && _this2._debugMeshes.has(el)) {
-				var mesh = _this2._debugMeshes.get(el);
-				console.log(mesh);
-				mesh.position.copy(worldPos);
-				mesh.quaternion.copy(worldRot);
-				mesh.scale.copy(worldScale);
-			}
-		});
-
-		// update collision list
-		this.world.performDiscreteCollisionDetection();
-
-		// get list of intersecting objects
-		var dispatcher = this.world.getDispatcher();
-		var hitCount = dispatcher.getNumManifolds();
-		var hits = new _Set();
-		for (var i = 0; i < hitCount; i++) {
-			var manifold = dispatcher.getManifoldByIndexInternal(i);
-			hits.add(manifold);
-		}
-
-		// detect collision-start
-		var newHits = set_difference(hits, this.manifolds);
-		var _iteratorNormalCompletion = true;
-		var _didIteratorError = false;
-		var _iteratorError = undefined;
-
 		try {
-			for (var _iterator = _getIterator(newHits), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-				var _manifold = _step.value;
-
-				var co1 = _manifold.getBody0(),
-				    co2 = _manifold.getBody1();
-				var el1 = this.el2co.getA(co1),
-				    el2 = this.el2co.getA(co2);
-				var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
-				    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
-				if (el1targets.includes(el2) && el2targets.includes(el1)) {
-					console.log('collision start');
-					el2.emit('collision-start', el1, false);
-					el1.emit('collision-start', el2, false);
+			// update object transforms
+			this.el2co.forEach(function (el, co) {
+				if (!_this2.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic) {
+					return;
 				}
+
+				el.object3D.updateMatrixWorld(true);
+				var localBounds = _this2.el2localBounds.get(el);
+				var worldPos = el.object3D.localToWorld(localBounds.getCenter());
+				var worldRot = el.object3D.getWorldQuaternion();
+				var worldScale = el.object3D.getWorldScale();
+				var transform = co.getWorldTransform();
+				var shape = co.getCollisionShape();
+				/*if(el.id === 'spawn'){
+    	console.log('transform update');
+    	console.log('local center:', localBounds.getCenter().toArray());
+    	console.log('world center:', worldPos.toArray());
+    	console.log('object root:', el.object3D.getWorldPosition().toArray());
+    }*/
+
+				transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
+				transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
+				shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+
+				_this2.forceUpdateObjects.delete(el);
+
+				if (_this2.el.sceneEl.components.debug && _this2._debugMeshes.has(el)) {
+					var mesh = _this2._debugMeshes.get(el);
+					mesh.position.copy(worldPos);
+					mesh.quaternion.copy(worldRot);
+					mesh.scale.copy(worldScale);
+				}
+			});
+
+			// update collision list
+			this.world.performDiscreteCollisionDetection();
+
+			// get list of intersecting objects
+			var dispatcher = this.world.getDispatcher();
+			var hitCount = dispatcher.getNumManifolds();
+			var hits = new _Set();
+			for (var i = 0; i < hitCount; i++) {
+				var manifold = dispatcher.getManifoldByIndexInternal(i);
+				hits.add(manifold);
 			}
 
-			// detect collision-end
-		} catch (err) {
-			_didIteratorError = true;
-			_iteratorError = err;
-		} finally {
+			// detect collision-start
+			var newHits = set_difference(hits, this.manifolds);
+			var _iteratorNormalCompletion = true;
+			var _didIteratorError = false;
+			var _iteratorError = undefined;
+
 			try {
-				if (!_iteratorNormalCompletion && _iterator.return) {
-					_iterator.return();
+				for (var _iterator = _getIterator(newHits), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+					var _manifold = _step.value;
+
+					var co1 = _manifold.getBody0(),
+					    co2 = _manifold.getBody1();
+					var el1 = this.el2co.getA(co1),
+					    el2 = this.el2co.getA(co2);
+					if (!el1 || !el2) continue;
+
+					var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
+					    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
+					if (el1targets.includes(el2) && el2targets.includes(el1)) {
+						console.log('collision start');
+						el2.emit('collision-start', el1, false);
+						el1.emit('collision-start', el2, false);
+					}
 				}
+
+				// detect collision-end
+			} catch (err) {
+				_didIteratorError = true;
+				_iteratorError = err;
 			} finally {
-				if (_didIteratorError) {
-					throw _iteratorError;
-				}
-			}
-		}
-
-		var oldHits = set_difference(this.manifolds, hits);
-		var _iteratorNormalCompletion2 = true;
-		var _didIteratorError2 = false;
-		var _iteratorError2 = undefined;
-
-		try {
-			for (var _iterator2 = _getIterator(oldHits), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-				var _manifold2 = _step2.value;
-
-				var co1 = _manifold2.getBody0(),
-				    co2 = _manifold2.getBody1();
-				var el1 = this.el2co.getA(co1),
-				    el2 = this.el2co.getA(co2);
-				var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
-				    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
-				if (el1targets.includes(el2) && el2targets.includes(el1)) {
-					console.log('collision end');
-					el2.emit('collision-end', el1, false);
-					el1.emit('collision-end', el2, false);
+				try {
+					if (!_iteratorNormalCompletion && _iterator.return) {
+						_iterator.return();
+					}
+				} finally {
+					if (_didIteratorError) {
+						throw _iteratorError;
+					}
 				}
 			}
 
-			// remember last frame's collisions
-		} catch (err) {
-			_didIteratorError2 = true;
-			_iteratorError2 = err;
-		} finally {
+			var oldHits = set_difference(this.manifolds, hits);
+			var _iteratorNormalCompletion2 = true;
+			var _didIteratorError2 = false;
+			var _iteratorError2 = undefined;
+
 			try {
-				if (!_iteratorNormalCompletion2 && _iterator2.return) {
-					_iterator2.return();
+				for (var _iterator2 = _getIterator(oldHits), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+					var _manifold2 = _step2.value;
+
+					var co1 = _manifold2.getBody0(),
+					    co2 = _manifold2.getBody1();
+					var el1 = this.el2co.getA(co1),
+					    el2 = this.el2co.getA(co2);
+					if (!el1 || !el2) continue;
+
+					var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
+					    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
+					if (el1targets.includes(el2) && el2targets.includes(el1)) {
+						console.log('collision end');
+						el2.emit('collision-end', el1, false);
+						el1.emit('collision-end', el2, false);
+					}
 				}
+
+				// remember last frame's collisions
+			} catch (err) {
+				_didIteratorError2 = true;
+				_iteratorError2 = err;
 			} finally {
-				if (_didIteratorError2) {
-					throw _iteratorError2;
+				try {
+					if (!_iteratorNormalCompletion2 && _iterator2.return) {
+						_iterator2.return();
+					}
+				} finally {
+					if (_didIteratorError2) {
+						throw _iteratorError2;
+					}
 				}
 			}
-		}
 
-		this.manifolds = hits;
+			this.manifolds = hits;
+		} catch (e) {
+			console.error('collision error', e.stack);
+			throw e;
+		}
 	},
 
 	registerCollisionBody: function registerCollisionBody(el) {
@@ -3733,6 +3780,9 @@ AFRAME.registerSystem('collision', {
 	},
 	isRegistered: function isRegistered(el) {
 		return !!this.el2co.getB(el);
+	},
+	forceUpdateTransform: function forceUpdateTransform(el) {
+		this.forceUpdateObjects.add(el);
 	}
 });
 
@@ -3745,13 +3795,19 @@ AFRAME.registerComponent('collision', {
 		if (this.el.object3DMap.mesh) this.updateBounds();
 		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
 	},
+	update: function update(oldData) {
+		// one last late update when kinematic stops
+		if (oldData.kinematic && !this.data.kinematic) this.system.forceUpdateTransform(this.el);
+	},
 	updateBounds: function updateBounds() {
+		//if(this.el.id === 'spawn') console.log('updateBounds');
 		if (this.system.isRegistered(this.el)) this.system.removeCollisionBody(this.el);
 		this.system.registerCollisionBody(this.el);
 		this.updateTransform();
 	},
 	updateTransform: function updateTransform() {
-		this.system.forceUpdateObjects.add(this.el);
+		//if(this.el.id === 'spawn') console.log('updateTransform');
+		this.system.forceUpdateTransform(this.el);
 	},
 	remove: function remove() {
 		this.system.removeCollisionBody(this.el);
@@ -3769,6 +3825,188 @@ AFRAME.registerComponent('grab-indicator', {
 		this.el.addEventListener('collision-end', function () {
 			_this.el.setAttribute('color', 'white');
 		});
+	}
+});
+
+var ITERATOR$4 = _wks('iterator');
+
+var core_isIterable = _core.isIterable = function (it) {
+  var O = Object(it);
+  return O[ITERATOR$4] !== undefined
+    || '@@iterator' in O
+    // eslint-disable-next-line no-prototype-builtins
+    || _iterators.hasOwnProperty(_classof(O));
+};
+
+var isIterable$2 = core_isIterable;
+
+var isIterable = createCommonjsModule(function (module) {
+module.exports = { "default": isIterable$2, __esModule: true };
+});
+
+unwrapExports(isIterable);
+
+var slicedToArray = createCommonjsModule(function (module, exports) {
+exports.__esModule = true;
+
+
+
+var _isIterable3 = _interopRequireDefault(isIterable);
+
+
+
+var _getIterator3 = _interopRequireDefault(getIterator);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = function () {
+  function sliceIterator(arr, i) {
+    var _arr = [];
+    var _n = true;
+    var _d = false;
+    var _e = undefined;
+
+    try {
+      for (var _i = (0, _getIterator3.default)(arr), _s; !(_n = (_s = _i.next()).done); _n = true) {
+        _arr.push(_s.value);
+
+        if (i && _arr.length === i) break;
+      }
+    } catch (err) {
+      _d = true;
+      _e = err;
+    } finally {
+      try {
+        if (!_n && _i["return"]) _i["return"]();
+      } finally {
+        if (_d) throw _e;
+      }
+    }
+
+    return _arr;
+  }
+
+  return function (arr, i) {
+    if (Array.isArray(arr)) {
+      return arr;
+    } else if ((0, _isIterable3.default)(Object(arr))) {
+      return sliceIterator(arr, i);
+    } else {
+      throw new TypeError("Invalid attempt to destructure non-iterable instance");
+    }
+  };
+}();
+});
+
+var _slicedToArray = unwrapExports(slicedToArray);
+
+AFRAME.registerComponent('spawner', {
+	schema: {
+		enabled: { default: true }
+	},
+	init: function init() {
+		this._hoverStart = this.hoverStart.bind(this);
+		this._hoverEnd = this.hoverEnd.bind(this);
+		this.handlers = new _Map();
+	},
+	update: function update() {
+		if (this.data.enabled) {
+			this.el.addEventListener('collision-start', this._hoverStart);
+			this.el.addEventListener('collision-end', this._hoverEnd);
+		} else {
+			this.el.removeEventListener('collision-start', this._hoverStart);
+			this.el.removeEventListener('collision-end', this._hoverEnd);
+
+			var _iteratorNormalCompletion = true;
+			var _didIteratorError = false;
+			var _iteratorError = undefined;
+
+			try {
+				for (var _iterator = _getIterator(this.handlers), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+					var _ref = _step.value;
+
+					var _ref2 = _slicedToArray(_ref, 2);
+
+					var el = _ref2[0];
+					var handler = _ref2[1];
+
+					this.hoverEnd({ detail: el });
+				}
+			} catch (err) {
+				_didIteratorError = true;
+				_iteratorError = err;
+			} finally {
+				try {
+					if (!_iteratorNormalCompletion && _iterator.return) {
+						_iterator.return();
+					}
+				} finally {
+					if (_didIteratorError) {
+						throw _iteratorError;
+					}
+				}
+			}
+		}
+	},
+	hoverStart: function hoverStart(_ref3) {
+		var target = _ref3.detail;
+
+		var handler = this.spawn(target);
+		this.handlers.set(target, handler);
+		target.addEventListener('gripdown', handler);
+	},
+	spawn: function spawn(target) {
+		var _this = this;
+
+		return function () {
+
+			// create new model
+			var child = document.createElement('a-entity');
+			child.classList.add('decoration');
+			child.setAttribute('mixin', 'model');
+			child.setAttribute('data-src', _this.el.getAttribute('gltf-model'));
+			child.setAttribute('data-spawned', 'true');
+			child.setAttribute('grabbable', { enabled: true });
+			child.setAttribute('collision', { with: '#lefthand,#righthand', kinematic: true });
+
+			// set transform
+			target.object3D.updateMatrixWorld(true);
+			var mat = new AFRAME.THREE.Matrix4().getInverse(target.object3D.matrixWorld).multiply(_this.el.object3D.matrixWorld);
+
+			var pos = new AFRAME.THREE.Vector3(),
+			    quat = new AFRAME.THREE.Quaternion(),
+			    scale = new AFRAME.THREE.Vector3();
+			mat.decompose(pos, quat, scale);
+			var rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
+
+			child.setAttribute('position', pos);
+			child.setAttribute('rotation', rot);
+			child.setAttribute('scale', scale);
+
+			target.appendChild(child);
+			_this.el.setAttribute('spawner', 'enabled', false);
+		};
+	},
+	hoverEnd: function hoverEnd(_ref4) {
+		var target = _ref4.detail;
+
+		console.log('hover end');
+		target.removeEventListener('gripdown', this.handlers.get(target));
+		this.handlers.delete(target);
+		this.el.setAttribute('spawner', 'enabled', true);
+	}
+});
+
+AFRAME.registerComponent('set-from-data', {
+	schema: {
+		from: { type: 'string' },
+		to: { type: 'array' }
+	},
+	multiple: true,
+	update: function update() {
+		var _el;
+
+		(_el = this.el).setAttribute.apply(_el, _toConsumableArray(this.data.to).concat([this.el.dataset[this.data.from]]));
 	}
 });
 

@@ -10,3 +10,5 @@ import './altspace-controls';
 import './grabbable';
 import './collision';
 import './grab-indicator';
+import './spawner';
+import './set-from-data';

@@ -14,11 +14,5 @@ AFRAME.registerComponent('place-for-space', {
 		else {
 			this.el.setAttribute('mixin', this.data.otherwise);
 		}
-		setTimeout(() => {
-			Array.prototype.slice.call(this.el.querySelectorAll('[collision]')).forEach(el => {
-				console.log('updating xfrm of '+el.id);
-				el.components.collision.updateTransform();
-			});
-		}, 0);
 	}
 });

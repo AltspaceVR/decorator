@@ -21,7 +21,10 @@ html
 
 			a-assets
 				a-asset-item#pedestal_model(src='build/pedestal.gltf')
+
 				a-mixin#highrise_spot(position='22.4 0.7 -11')
+
+				a-mixin#model(gltf-model, set-from-data='from: src; to: gltf-model;')
 
 			a-entity#spawn-complex(place-for-space='templates: highrise_homespace; mixins: highrise_spot')
 
@@ -29,7 +32,7 @@ html
 
 				a-entity#spawn_point(position='1 .55 2')
 					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
-					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', grabbable,
+					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', spawner,
 						src='https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
 					//a-box#eventtest(position='0 0 1', collision='with: #lefthand,#righthand', grabbable)
 
@@ -52,9 +55,11 @@ html
 						library-advance='1')
 						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Next; font-size: 1')
 
+			a-entity#decorations
+			
 			a-sphere#lefthand(radius=.005, altspace-controls='left', grab-indicator,
 				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
 			a-sphere#righthand(radius=.005, altspace-controls='right', grab-indicator,
 				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
-			a-sphere(radius=.1)
+
 			a-entity(position='0 0 2'): a-camera: a-cursor
