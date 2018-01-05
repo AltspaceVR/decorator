@@ -21,16 +21,22 @@ html
 
 			a-assets
 				a-asset-item#pedestal_model(src='build/pedestal.gltf')
-
-				a-mixin#highrise_spot(position='22.4 0.7 -11')
-
 				a-mixin#model(gltf-model, set-from-data='from: src; to: gltf-model;')
 
-			a-entity#spawn-complex(place-for-space='templates: highrise_homespace; mixins: highrise_spot')
+				a-mixin#highrise_spot(position='8 0.5 2.8', rotation='0 180 0')
+				a-mixin#exhibition_spot(position='7.6 0.5 -4')
+				a-mixin#conference_spot(position='1 0.5 -14.5')
+				a-mixin#lodge_spot(position='9.5 0.5 -0.5', rotation='0 180 0')
+				a-mixin#parlor_spot(position='8 2 8.8', rotation='0 -90 0')
+
+			-
+				var pfs = 'templates: highrise_homespace,exhibition-homespace,conference-homespace,lodge-homespace,parlor-homespace; '
+					+ 'mixins: highrise_spot,exhibition_spot,conference_spot,lodge_spot,parlor_spot;'
+			a-entity#spawn-complex(place-for-space=pfs)
 
 				a-sphere(radius='.005')
 
-				a-entity#spawn_point(position='1 .55 2')
+				a-entity#spawn_point(position='1 .55 0')
 					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
 					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', spawner,
 						src='https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
@@ -56,7 +62,7 @@ html
 						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Next; font-size: 1')
 
 			a-entity#decorations
-			
+
 			a-sphere#lefthand(radius=.005, altspace-controls='left', grab-indicator,
 				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
 			a-sphere#righthand(radius=.005, altspace-controls='right', grab-indicator,
