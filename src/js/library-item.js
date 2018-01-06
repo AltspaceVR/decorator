@@ -24,7 +24,7 @@ AFRAME.registerComponent('library-item',
 	updateDimensions: function()
 	{
 		let map = this.el.object3DMap.mesh.material.map;
-		let img = map ? map.image : {width: 1, height: 1};
+		let img = map && map.image && map.image.tagName === 'IMG' ? map.image : {width: 1, height: 1};
 		let ratio = img.width / img.height;
 		
 		if(ratio > 1){

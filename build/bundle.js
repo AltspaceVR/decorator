@@ -2127,7 +2127,7 @@ AFRAME.registerComponent('library-item', {
 	},
 	updateDimensions: function updateDimensions() {
 		var map = this.el.object3DMap.mesh.material.map;
-		var img = map ? map.image : { width: 1, height: 1 };
+		var img = map && map.image && map.image.tagName === 'IMG' ? map.image : { width: 1, height: 1 };
 		var ratio = img.width / img.height;
 
 		if (ratio > 1) {
@@ -3108,6 +3108,78 @@ exports.default = function (arr) {
 
 var _toConsumableArray = unwrapExports(toConsumableArray);
 
+var ITERATOR$4 = _wks('iterator');
+
+var core_isIterable = _core.isIterable = function (it) {
+  var O = Object(it);
+  return O[ITERATOR$4] !== undefined
+    || '@@iterator' in O
+    // eslint-disable-next-line no-prototype-builtins
+    || _iterators.hasOwnProperty(_classof(O));
+};
+
+var isIterable$2 = core_isIterable;
+
+var isIterable = createCommonjsModule(function (module) {
+module.exports = { "default": isIterable$2, __esModule: true };
+});
+
+unwrapExports(isIterable);
+
+var slicedToArray = createCommonjsModule(function (module, exports) {
+exports.__esModule = true;
+
+
+
+var _isIterable3 = _interopRequireDefault(isIterable);
+
+
+
+var _getIterator3 = _interopRequireDefault(getIterator);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.default = function () {
+  function sliceIterator(arr, i) {
+    var _arr = [];
+    var _n = true;
+    var _d = false;
+    var _e = undefined;
+
+    try {
+      for (var _i = (0, _getIterator3.default)(arr), _s; !(_n = (_s = _i.next()).done); _n = true) {
+        _arr.push(_s.value);
+
+        if (i && _arr.length === i) break;
+      }
+    } catch (err) {
+      _d = true;
+      _e = err;
+    } finally {
+      try {
+        if (!_n && _i["return"]) _i["return"]();
+      } finally {
+        if (_d) throw _e;
+      }
+    }
+
+    return _arr;
+  }
+
+  return function (arr, i) {
+    if (Array.isArray(arr)) {
+      return arr;
+    } else if ((0, _isIterable3.default)(Object(arr))) {
+      return sliceIterator(arr, i);
+    } else {
+      throw new TypeError("Invalid attempt to destructure non-iterable instance");
+    }
+  };
+}();
+});
+
+var _slicedToArray = unwrapExports(slicedToArray);
+
 var MAP = 'Map';
 
 // 23.1 Map Objects
@@ -3571,6 +3643,50 @@ _addToUnscopables$2('includes');
 
 var includes = _core$2.Array.includes;
 
+var AmmoPool = function () {
+	function AmmoPool() {
+		_classCallCheck(this, AmmoPool);
+
+		this._pools = {};
+		this._refs = new _Map();
+	}
+
+	_createClass(AmmoPool, [{
+		key: "get",
+		value: function get(type) {
+			this._pools[type] = this._pools[type] || [];
+			var ret = this._pools[type].shift() || new Ammo[type]();
+			this._refs.set(ret, type);
+			return ret;
+		}
+	}, {
+		key: "getSome",
+		value: function getSome(type, count) {
+			var acc = [];
+			for (var i = 0; i < count; i++) {
+				acc.push(this.get(type));
+			}return acc;
+		}
+	}, {
+		key: "done",
+		value: function done() {
+			var _this = this;
+
+			for (var _len = arguments.length, vals = Array(_len), _key = 0; _key < _len; _key++) {
+				vals[_key] = arguments[_key];
+			}
+
+			vals.forEach(function (val) {
+				var type = _this._refs.get(val);
+				_this._pools[type] = _this._pools[type] || [];
+				_this._pools[type].push(val);
+			});
+		}
+	}]);
+
+	return AmmoPool;
+}();
+
 /* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
 
 AFRAME.registerSystem('collision', {
@@ -3584,13 +3700,24 @@ AFRAME.registerSystem('collision', {
 		this.manifolds = new _Set();
 		this.forceUpdateObjects = new _Set();
 		this._debugMeshes = new _Map();
+		this.ap = new AmmoPool();
 
 		// ammo setup
 		Ammo().then(function () {
+
+			// initialize sim world
 			var collisionConfig = new Ammo.btDefaultCollisionConfiguration();
 			var dispatcher = new Ammo.btCollisionDispatcher(collisionConfig);
-			var broadphase = new Ammo.btAxisSweep3(new Ammo.btVector3(-100, -100, -100), new Ammo.btVector3(100, 100, 100));
+
+			var _ap$getSome = _this.ap.getSome('btVector3', 2),
+			    _ap$getSome2 = _slicedToArray(_ap$getSome, 2),
+			    min = _ap$getSome2[0],
+			    max = _ap$getSome2[1];
+
+			min.setValue(-100, -100, -100);max.setValue(100, 100, 100);
+			var broadphase = new Ammo.btAxisSweep3(min, max);
 			_this.world = new Ammo.btCollisionWorld(dispatcher, broadphase, collisionConfig);
+			_this.ap.done(min, max);
 
 			_this.regQueue.forEach(function (el) {
 				return _this.registerCollisionBody(el);
@@ -3625,9 +3752,21 @@ AFRAME.registerSystem('collision', {
     	console.log('object root:', el.object3D.getWorldPosition().toArray());
     }*/
 
-				transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
-				transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
-				shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+				// make sure to free any allocated vectors!
+
+				var _ap$getSome3 = _this2.ap.getSome('btVector3', 2),
+				    _ap$getSome4 = _slicedToArray(_ap$getSome3, 2),
+				    pos = _ap$getSome4[0],
+				    scale = _ap$getSome4[1];
+
+				var quat = _this2.ap.get('btQuaternion');
+				pos.setValue.apply(pos, _toConsumableArray(worldPos.toArray()));
+				quat.setValue.apply(quat, _toConsumableArray(worldRot.toArray()));
+				scale.setValue.apply(scale, _toConsumableArray(worldScale.toArray()));
+				transform.setOrigin(pos);
+				transform.setRotation(quat);
+				shape.setLocalScaling(scale);
+				_this2.ap.done(pos, quat, scale);
 
 				_this2.forceUpdateObjects.delete(el);
 
@@ -3827,78 +3966,6 @@ AFRAME.registerComponent('grab-indicator', {
 		});
 	}
 });
-
-var ITERATOR$4 = _wks('iterator');
-
-var core_isIterable = _core.isIterable = function (it) {
-  var O = Object(it);
-  return O[ITERATOR$4] !== undefined
-    || '@@iterator' in O
-    // eslint-disable-next-line no-prototype-builtins
-    || _iterators.hasOwnProperty(_classof(O));
-};
-
-var isIterable$2 = core_isIterable;
-
-var isIterable = createCommonjsModule(function (module) {
-module.exports = { "default": isIterable$2, __esModule: true };
-});
-
-unwrapExports(isIterable);
-
-var slicedToArray = createCommonjsModule(function (module, exports) {
-exports.__esModule = true;
-
-
-
-var _isIterable3 = _interopRequireDefault(isIterable);
-
-
-
-var _getIterator3 = _interopRequireDefault(getIterator);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-exports.default = function () {
-  function sliceIterator(arr, i) {
-    var _arr = [];
-    var _n = true;
-    var _d = false;
-    var _e = undefined;
-
-    try {
-      for (var _i = (0, _getIterator3.default)(arr), _s; !(_n = (_s = _i.next()).done); _n = true) {
-        _arr.push(_s.value);
-
-        if (i && _arr.length === i) break;
-      }
-    } catch (err) {
-      _d = true;
-      _e = err;
-    } finally {
-      try {
-        if (!_n && _i["return"]) _i["return"]();
-      } finally {
-        if (_d) throw _e;
-      }
-    }
-
-    return _arr;
-  }
-
-  return function (arr, i) {
-    if (Array.isArray(arr)) {
-      return arr;
-    } else if ((0, _isIterable3.default)(Object(arr))) {
-      return sliceIterator(arr, i);
-    } else {
-      throw new TypeError("Invalid attempt to destructure non-iterable instance");
-    }
-  };
-}();
-});
-
-var _slicedToArray = unwrapExports(slicedToArray);
 
 AFRAME.registerComponent('spawner', {
 	schema: {

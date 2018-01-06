@@ -1,6 +1,7 @@
 import DoubleMap from './double-map';
 import includes from 'core-js/fn/array/includes';
 import {set_difference} from './utils';
+import AmmoPool from './ammo-pool';
 
 /* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
 
@@ -15,16 +16,19 @@ AFRAME.registerSystem('collision',
 		this.manifolds = new Set();
 		this.forceUpdateObjects = new Set();
 		this._debugMeshes = new Map();
+		this.ap = new AmmoPool();
 
 		// ammo setup
 		Ammo().then(() => {
+
+			// initialize sim world
 			let collisionConfig = new Ammo.btDefaultCollisionConfiguration();
 			let dispatcher = new Ammo.btCollisionDispatcher(collisionConfig);
-			let broadphase = new Ammo.btAxisSweep3(
-				new Ammo.btVector3(-100,-100,-100),
-				new Ammo.btVector3(100,100,100)
-			);
+			let [min, max] = this.ap.getSome('btVector3', 2);
+			min.setValue(-100, -100, -100); max.setValue(100, 100, 100);
+			let broadphase = new Ammo.btAxisSweep3(min, max);
 			this.world = new Ammo.btCollisionWorld(dispatcher, broadphase, collisionConfig);
+			this.ap.done(min, max);
 
 			this.regQueue.forEach(el => this.registerCollisionBody(el));
 			this.regQueue = null;
@@ -57,9 +61,16 @@ AFRAME.registerSystem('collision',
 				console.log('object root:', el.object3D.getWorldPosition().toArray());
 			}*/
 
-			transform.setOrigin(new Ammo.btVector3(worldPos.x, worldPos.y, worldPos.z));
-			transform.setRotation(new Ammo.btQuaternion(worldRot.x, worldRot.y, worldRot.z, worldRot.w));
-			shape.setLocalScaling(new Ammo.btVector3(worldScale.x, worldScale.y, worldScale.z));
+			// make sure to free any allocated vectors!
+			let [pos, scale] = this.ap.getSome('btVector3', 2);
+			let quat = this.ap.get('btQuaternion');
+			pos.setValue(...worldPos.toArray());
+			quat.setValue(...worldRot.toArray());
+			scale.setValue(...worldScale.toArray());
+			transform.setOrigin(pos);
+			transform.setRotation(quat);
+			shape.setLocalScaling(scale);
+			this.ap.done(pos, quat, scale);
 
 			this.forceUpdateObjects.delete(el);
 
