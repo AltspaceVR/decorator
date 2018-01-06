@@ -2842,7 +2842,7 @@ AFRAME.registerComponent('maintain-size', {
 		var box = new AFRAME.THREE.Box3();
 		box.setFromObject(this.el.object3D);
 		var size = box.getSize(),
-		    center = box.getCenter().sub(this.el.object3D.getWorldPosition());
+		    center = this.el.object3D.worldToLocal(box.getCenter());
 		var ratio = Math.min(this.data.x / size.x, this.data.y / size.y, this.data.z / size.z);
 
 		this.el.setAttribute('scale', { x: ratio, y: ratio, z: ratio });
@@ -3731,9 +3731,9 @@ AFRAME.registerSystem('collision', {
 
 		if (!this.world) return;
 
-		try {
-			// update object transforms
-			this.el2co.forEach(function (el, co) {
+		// update object transforms
+		this.el2co.forEach(function (el, co) {
+			try {
 				if (!_this2.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic) {
 					return;
 				}
@@ -3776,20 +3776,24 @@ AFRAME.registerSystem('collision', {
 					mesh.quaternion.copy(worldRot);
 					mesh.scale.copy(worldScale);
 				}
-			});
-
-			// update collision list
-			this.world.performDiscreteCollisionDetection();
-
-			// get list of intersecting objects
-			var dispatcher = this.world.getDispatcher();
-			var hitCount = dispatcher.getNumManifolds();
-			var hits = new _Set();
-			for (var i = 0; i < hitCount; i++) {
-				var manifold = dispatcher.getManifoldByIndexInternal(i);
-				hits.add(manifold);
+			} catch (e) {
+				console.error('xfrm update failed:', err, el);
 			}
+		});
 
+		// update collision list
+		this.world.performDiscreteCollisionDetection();
+
+		// get list of intersecting objects
+		var dispatcher = this.world.getDispatcher();
+		var hitCount = dispatcher.getNumManifolds();
+		var hits = new _Set();
+		for (var i = 0; i < hitCount; i++) {
+			var manifold = dispatcher.getManifoldByIndexInternal(i);
+			hits.add(manifold);
+		}
+
+		try {
 			// detect collision-start
 			var newHits = set_difference(hits, this.manifolds);
 			var _iteratorNormalCompletion = true;
@@ -3814,8 +3818,6 @@ AFRAME.registerSystem('collision', {
 						el1.emit('collision-start', el2, false);
 					}
 				}
-
-				// detect collision-end
 			} catch (err) {
 				_didIteratorError = true;
 				_iteratorError = err;
@@ -3830,7 +3832,12 @@ AFRAME.registerSystem('collision', {
 					}
 				}
 			}
+		} catch (e) {
+			console.error('coll-start failed:', e);
+		}
 
+		try {
+			// detect collision-end
 			var oldHits = set_difference(this.manifolds, hits);
 			var _iteratorNormalCompletion2 = true;
 			var _didIteratorError2 = false;
@@ -3840,22 +3847,20 @@ AFRAME.registerSystem('collision', {
 				for (var _iterator2 = _getIterator(oldHits), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
 					var _manifold2 = _step2.value;
 
-					var co1 = _manifold2.getBody0(),
-					    co2 = _manifold2.getBody1();
-					var el1 = this.el2co.getA(co1),
-					    el2 = this.el2co.getA(co2);
-					if (!el1 || !el2) continue;
+					var _co = _manifold2.getBody0(),
+					    _co2 = _manifold2.getBody1();
+					var _el = this.el2co.getA(_co),
+					    _el2 = this.el2co.getA(_co2);
+					if (!_el || !_el2) continue;
 
-					var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
-					    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
-					if (el1targets.includes(el2) && el2targets.includes(el1)) {
+					var _el1targets = [].concat(_toConsumableArray(_el.getAttribute('collision').with)),
+					    _el2targets = [].concat(_toConsumableArray(_el2.getAttribute('collision').with));
+					if (_el1targets.includes(_el2) && _el2targets.includes(_el)) {
 						console.log('collision end');
-						el2.emit('collision-end', el1, false);
-						el1.emit('collision-end', el2, false);
+						_el2.emit('collision-end', _el, false);
+						_el.emit('collision-end', _el2, false);
 					}
 				}
-
-				// remember last frame's collisions
 			} catch (err) {
 				_didIteratorError2 = true;
 				_iteratorError2 = err;
@@ -3870,12 +3875,12 @@ AFRAME.registerSystem('collision', {
 					}
 				}
 			}
-
-			this.manifolds = hits;
 		} catch (e) {
-			console.error('collision error', e.stack);
-			throw e;
+			console.error('coll-start failed:', e);
 		}
+
+		// remember last frame's collisions
+		this.manifolds = hits;
 	},
 
 	registerCollisionBody: function registerCollisionBody(el) {

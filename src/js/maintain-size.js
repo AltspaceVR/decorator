@@ -11,7 +11,7 @@ AFRAME.registerComponent('maintain-size', {
 		let box = new AFRAME.THREE.Box3();
 		box.setFromObject(this.el.object3D);
 		let size = box.getSize(),
-			center = box.getCenter().sub(this.el.object3D.getWorldPosition());
+			center = this.el.object3D.worldToLocal(box.getCenter());
 		let ratio = Math.min(this.data.x/size.x, this.data.y/size.y, this.data.z/size.z);
 		
 		this.el.setAttribute('scale', {x: ratio, y: ratio, z: ratio});
@@ -19,7 +19,6 @@ AFRAME.registerComponent('maintain-size', {
 
 		if(this.el.components.collision){
 			this.el.components.collision.updateTransform();
-			//if(this.el.id === 'spawn') console.log('rescale');
 		}
 	}
 });

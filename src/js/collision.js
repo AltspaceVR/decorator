@@ -39,10 +39,10 @@ AFRAME.registerSystem('collision',
 	{
 		if(!this.world) return;
 
-		try {
 		// update object transforms
 		this.el2co.forEach((el, co) => 
 		{
+			try {
 			if(!this.forceUpdateObjects.has(el) && !el.getAttribute('collision').kinematic){
 				return;
 			}
@@ -80,6 +80,10 @@ AFRAME.registerSystem('collision',
 				mesh.quaternion.copy(worldRot);
 				mesh.scale.copy(worldScale);
 			}
+			}
+			catch(e){
+				console.error('xfrm update failed:', err, el);
+			}
 		});
 
 		// update collision list
@@ -94,6 +98,7 @@ AFRAME.registerSystem('collision',
 			hits.add(manifold);
 		}
 
+		try {
 		// detect collision-start
 		let newHits = set_difference(hits, this.manifolds);
 		for(let manifold of newHits)
@@ -110,7 +115,12 @@ AFRAME.registerSystem('collision',
 				el1.emit('collision-start', el2, false);
 			}
 		}
+		}
+		catch(e){
+			console.error('coll-start failed:', e);
+		}
 
+		try {
 		// detect collision-end
 		let oldHits = set_difference(this.manifolds, hits);
 		for(let manifold of oldHits)
@@ -127,14 +137,13 @@ AFRAME.registerSystem('collision',
 				el1.emit('collision-end', el2, false);
 			}
 		}
-
-		// remember last frame's collisions
-		this.manifolds = hits;
 		}
 		catch(e){
-			console.error('collision error', e.stack);
-			throw e;
+			console.error('coll-start failed:', e);
 		}
+		
+		// remember last frame's collisions
+		this.manifolds = hits;
 	},
 
 	registerCollisionBody(el)
