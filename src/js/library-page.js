@@ -8,7 +8,8 @@ AFRAME.registerComponent('library-page',
 	{
 		this.el.emit('pageupdatestart');
 		try {
-			this.currentPage = await this.el.sceneEl.systems[`${this.data.service}-service`].fakeGetListing(this.data.page);
+			let fnName = this.el.sceneEl.hasAttribute('debug') ? 'fakeGetListing' : 'getListing';
+			this.currentPage = await this.el.sceneEl.systems[`${this.data.service}-service`][fnName](this.data.page);
 		}
 		catch(e){
 			console.error(e.stack);

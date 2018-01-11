@@ -74,7 +74,7 @@ AFRAME.registerSystem('collision',
 
 			this.forceUpdateObjects.delete(el);
 
-			if(this.el.sceneEl.components.debug && this._debugMeshes.has(el)){
+			if(this.el.sceneEl.hasAttribute('debug') && this._debugMeshes.has(el)){
 				let mesh = this._debugMeshes.get(el);
 				mesh.position.copy(worldPos);
 				mesh.quaternion.copy(worldRot);
@@ -107,7 +107,8 @@ AFRAME.registerSystem('collision',
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
 			if(!el1 || !el2) continue;
 
-			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
+			console.log(el1.getAttribute('collision').with, el2.getAttribute('collision').with);
+			let el1targets = el1.getAttribute('collision').with, el2targets = el2.getAttribute('collision').with;
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
 				console.log('collision start');
@@ -170,7 +171,7 @@ AFRAME.registerSystem('collision',
 		this.world.addCollisionObject(co);
 
 		// create debug mesh
-		if(this.el.sceneEl.components.debug){
+		if(this.el.sceneEl.hasAttribute('debug')){
 			let mesh = new THREE.Mesh(
 				new THREE.BoxBufferGeometry(size.x, size.y, size.z),
 				new THREE.MeshBasicMaterial({color: 'magenta', transparent: true, opacity: .2})
@@ -186,7 +187,7 @@ AFRAME.registerSystem('collision',
 		this.world.removeCollisionObject(co);
 		this.el2co.deleteA(el);
 
-		if(this.el.sceneEl.components.debug){
+		if(this.el.sceneEl.hasAttribute('debug')){
 			this.el.sceneEl.object3D.remove(this._debugMeshes.get(el));
 			this._debugMeshes.delete(el);
 		}

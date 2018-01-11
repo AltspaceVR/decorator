@@ -2068,35 +2068,37 @@ AFRAME.registerComponent('library-page', {
 	},
 	update: function () {
 		var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(oldData) {
+			var fnName;
 			return regenerator.wrap(function _callee$(_context) {
 				while (1) {
 					switch (_context.prev = _context.next) {
 						case 0:
 							this.el.emit('pageupdatestart');
 							_context.prev = 1;
-							_context.next = 4;
-							return this.el.sceneEl.systems[this.data.service + '-service'].fakeGetListing(this.data.page);
+							fnName = this.el.sceneEl.hasAttribute('debug') ? 'fakeGetListing' : 'getListing';
+							_context.next = 5;
+							return this.el.sceneEl.systems[this.data.service + '-service'][fnName](this.data.page);
 
-						case 4:
+						case 5:
 							this.currentPage = _context.sent;
-							_context.next = 10;
+							_context.next = 11;
 							break;
 
-						case 7:
-							_context.prev = 7;
+						case 8:
+							_context.prev = 8;
 							_context.t0 = _context['catch'](1);
 
 							console.error(_context.t0.stack);
 
-						case 10:
+						case 11:
 							this.el.emit('pageupdateend');
 
-						case 11:
+						case 12:
 						case 'end':
 							return _context.stop();
 					}
 				}
-			}, _callee, this, [[1, 7]]);
+			}, _callee, this, [[1, 8]]);
 		}));
 
 		function update(_x) {
@@ -2850,7 +2852,6 @@ AFRAME.registerComponent('maintain-size', {
 
 		if (this.el.components.collision) {
 			this.el.components.collision.updateTransform();
-			//if(this.el.id === 'spawn') console.log('rescale');
 		}
 	}
 });
@@ -3015,18 +3016,18 @@ AFRAME.registerComponent('grabbable', {
 		var hand = _ref3.detail;
 
 		// set transform
+		this.data.dropTarget.object3D.updateMatrixWorld(true);
 		this.el.object3D.updateMatrixWorld(true);
-		console.log('held local pos:', this.el.object3D.position.toArray());
-		console.log('held world pos:', this.el.object3D.getWorldPosition().toArray());
-		var mat = new AFRAME.THREE.Matrix4().getInverse(this.data.dropTarget.object3D.matrixWorld).multiply(this.el.object3D.matrixWorld);
 
-		var pos = new AFRAME.THREE.Vector3(),
+		// set transform
+		var mat = new AFRAME.THREE.Matrix4().getInverse(this.data.dropTarget.object3D.matrixWorld).multiply(this.el.object3D.matrixWorld),
+		    pos = new AFRAME.THREE.Vector3(),
 		    quat = new AFRAME.THREE.Quaternion(),
+		    rot = new AFRAME.THREE.Euler(),
 		    scale = new AFRAME.THREE.Vector3();
 		mat.decompose(pos, quat, scale);
-		var rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
-
-		console.log('dropped local pos:', pos.toArray());
+		rot.setFromQuaternion(quat);
+		rot = rot.toVector3().multiplyScalar(180 / Math.PI);
 
 		this.el.setAttribute('position', pos);
 		this.el.setAttribute('rotation', rot);
@@ -3770,7 +3771,7 @@ AFRAME.registerSystem('collision', {
 
 				_this2.forceUpdateObjects.delete(el);
 
-				if (_this2.el.sceneEl.components.debug && _this2._debugMeshes.has(el)) {
+				if (_this2.el.sceneEl.hasAttribute('debug') && _this2._debugMeshes.has(el)) {
 					var mesh = _this2._debugMeshes.get(el);
 					mesh.position.copy(worldPos);
 					mesh.quaternion.copy(worldRot);
@@ -3810,8 +3811,9 @@ AFRAME.registerSystem('collision', {
 					    el2 = this.el2co.getA(co2);
 					if (!el1 || !el2) continue;
 
-					var el1targets = [].concat(_toConsumableArray(el1.getAttribute('collision').with)),
-					    el2targets = [].concat(_toConsumableArray(el2.getAttribute('collision').with));
+					console.log(el1.getAttribute('collision').with, el2.getAttribute('collision').with);
+					var el1targets = el1.getAttribute('collision').with,
+					    el2targets = el2.getAttribute('collision').with;
 					if (el1targets.includes(el2) && el2targets.includes(el1)) {
 						console.log('collision start');
 						el2.emit('collision-start', el1, false);
@@ -3906,7 +3908,7 @@ AFRAME.registerSystem('collision', {
 		this.world.addCollisionObject(co);
 
 		// create debug mesh
-		if (this.el.sceneEl.components.debug) {
+		if (this.el.sceneEl.hasAttribute('debug')) {
 			var mesh = new THREE.Mesh(new THREE.BoxBufferGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ color: 'magenta', transparent: true, opacity: .2 }));
 			this._debugMeshes.set(el, mesh);
 			this.el.sceneEl.object3D.add(mesh);
@@ -3917,7 +3919,7 @@ AFRAME.registerSystem('collision', {
 		this.world.removeCollisionObject(co);
 		this.el2co.deleteA(el);
 
-		if (this.el.sceneEl.components.debug) {
+		if (this.el.sceneEl.hasAttribute('debug')) {
 			this.el.sceneEl.object3D.remove(this._debugMeshes.get(el));
 			this._debugMeshes.delete(el);
 		}
@@ -4038,24 +4040,31 @@ AFRAME.registerComponent('spawner', {
 			child.setAttribute('mixin', 'model');
 			child.setAttribute('data-src', _this.el.getAttribute('gltf-model'));
 			child.setAttribute('data-spawned', 'true');
-			child.setAttribute('grabbable', { enabled: true });
+			child.setAttribute('grabbable', { enabled: false });
 			child.setAttribute('collision', { with: '#lefthand,#righthand', kinematic: true });
+			target.appendChild(child);
+
+			_this.el.object3D.updateMatrixWorld(true);
+			target.object3D.updateMatrixWorld(true);
+			console.log('target pos:', target.object3D.getWorldPosition().toArray());
+			console.log('entity pos:', _this.el.object3D.getWorldPosition().toArray());
 
 			// set transform
-			target.object3D.updateMatrixWorld(true);
-			var mat = new AFRAME.THREE.Matrix4().getInverse(target.object3D.matrixWorld).multiply(_this.el.object3D.matrixWorld);
-
-			var pos = new AFRAME.THREE.Vector3(),
+			var mat = new AFRAME.THREE.Matrix4().getInverse(target.object3D.matrixWorld).multiply(_this.el.object3D.matrixWorld),
+			    pos = new AFRAME.THREE.Vector3(),
 			    quat = new AFRAME.THREE.Quaternion(),
+			    rot = new AFRAME.THREE.Euler(),
 			    scale = new AFRAME.THREE.Vector3();
 			mat.decompose(pos, quat, scale);
-			var rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
+			rot.setFromQuaternion(quat, 'XYZ');
+			rot = rot.toVector3().multiplyScalar(180 / Math.PI);
+
+			console.log('relative pos:', pos.toArray());
 
 			child.setAttribute('position', pos);
 			child.setAttribute('rotation', rot);
 			child.setAttribute('scale', scale);
 
-			target.appendChild(child);
 			_this.el.setAttribute('spawner', 'enabled', false);
 		};
 	},

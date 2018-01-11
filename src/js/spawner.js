@@ -1,6 +1,7 @@
 AFRAME.registerComponent('spawner', {
 	schema: {
-		enabled: {default: true}
+		enabled: {default: true},
+		spawnTarget: {type: 'selector', default: '#decorations'}
 	},
 	init: function()
 	{
@@ -39,25 +40,33 @@ AFRAME.registerComponent('spawner', {
 			child.setAttribute('mixin', 'model');
 			child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
 			child.setAttribute('data-spawned', 'true');
-			child.setAttribute('grabbable', {enabled: true});
+			child.setAttribute('grabbable', {enabled: false});
 			child.setAttribute('collision', {with: '#lefthand,#righthand', kinematic: true});
+			target.appendChild(child);
+
+			this.el.object3D.updateMatrixWorld(true);
+			target.object3D.updateMatrixWorld(true);
+			console.log('target pos:', target.object3D.getWorldPosition().toArray());
+			console.log('entity pos:', this.el.object3D.getWorldPosition().toArray());
 
 			// set transform
-			target.object3D.updateMatrixWorld(true);
-			let mat = new AFRAME.THREE.Matrix4().getInverse(target.object3D.matrixWorld)
-				.multiply(this.el.object3D.matrixWorld);
-
-			let pos = new AFRAME.THREE.Vector3(),
+			let mat = new AFRAME.THREE.Matrix4()
+				.getInverse(target.object3D.matrixWorld)
+				.multiply(this.el.object3D.matrixWorld),
+				pos = new AFRAME.THREE.Vector3(),
 				quat = new AFRAME.THREE.Quaternion(),
+				rot = new AFRAME.THREE.Euler(),
 				scale = new AFRAME.THREE.Vector3();
 			mat.decompose(pos, quat, scale);
-			let rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
+			rot.setFromQuaternion(quat, 'XYZ');
+			rot = rot.toVector3().multiplyScalar(180/Math.PI);
+
+			console.log('relative pos:', pos.toArray());
 
 			child.setAttribute('position', pos);
 			child.setAttribute('rotation', rot);
 			child.setAttribute('scale', scale);
 
-			target.appendChild(child);
 			this.el.setAttribute('spawner', 'enabled', false);
 		};
 	},

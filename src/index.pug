@@ -5,18 +5,18 @@ html
 		if production
 			script(src='https://aframe.io/releases/0.7.0/aframe.min.js')
 			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.min.js')
-			script(src='https://cdn.rawgit.com/kripken/ammo.js/1296d374/builds/ammo.js')
+			//-script(src='https://cdn.rawgit.com/kripken/ammo.js/1296d374/builds/ammo.js')
 			script(src='build/bundle.min.js')
 		else
 			script(src='https://aframe.io/releases/0.7.0/aframe.js')
 			//-script(src='http://localhost:8001/dist/altspace.js')
 			script(src='https://sdk.altvr.com/libs/altspace.js/2.7.1/altspace.js')
-			script(src='lib/ammo.js')
 			script(src='build/bundle.js')
 		script(src="https://unpkg.com/aframe-animation-component/dist/aframe-animation-component.min.js")
+		script(src='lib/ammo.js')
 			
 	body
-		a-scene(debug, altspace='fullspace: true',
+		a-scene(debug=!production, altspace='fullspace: true',
 			poly-service='key: AIzaSyCYv7u5gLyRbo0amrki3732pbeqsHppIbo')
 
 			a-assets
@@ -39,7 +39,7 @@ html
 				a-entity#spawn_point(position='1 .55 0')
 					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
 					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', spawner,
-						src='https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
+						src=!production && 'https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
 					//a-box#eventtest(position='0 0 1', collision='with: #lefthand,#righthand', grabbable)
 
 				a-entity#spawn_menu(position='-1 1 0' library-page='service: poly; page: 0')
@@ -64,8 +64,8 @@ html
 			a-entity#decorations
 
 			a-sphere#lefthand(radius=.005, altspace-controls='left', grab-indicator,
-				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
+				altspace-cursor-collider='enabled: false', collision='with: #spawn,.decoration; kinematic: true')
 			a-sphere#righthand(radius=.005, altspace-controls='right', grab-indicator,
-				altspace-cursor-collider='enabled: false', collision='with: #spawn; kinematic: true')
+				altspace-cursor-collider='enabled: false', collision='with: #spawn,.decoration; kinematic: true')
 
 			a-entity(position='0 0 2'): a-camera: a-cursor

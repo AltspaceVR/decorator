@@ -38,19 +38,20 @@ AFRAME.registerComponent('grabbable', {
 	drop: function({detail: hand})
 	{
 		// set transform
+		this.data.dropTarget.object3D.updateMatrixWorld(true);
 		this.el.object3D.updateMatrixWorld(true);
-		console.log('held local pos:', this.el.object3D.position.toArray());
-		console.log('held world pos:', this.el.object3D.getWorldPosition().toArray());
-		let mat = new AFRAME.THREE.Matrix4().getInverse(this.data.dropTarget.object3D.matrixWorld)
-			.multiply(this.el.object3D.matrixWorld);
 
-		let pos = new AFRAME.THREE.Vector3(),
+		// set transform
+		let mat = new AFRAME.THREE.Matrix4()
+			.getInverse(this.data.dropTarget.object3D.matrixWorld)
+			.multiply(this.el.object3D.matrixWorld),
+			pos = new AFRAME.THREE.Vector3(),
 			quat = new AFRAME.THREE.Quaternion(),
+			rot = new AFRAME.THREE.Euler(),
 			scale = new AFRAME.THREE.Vector3();
 		mat.decompose(pos, quat, scale);
-		let rot = new AFRAME.THREE.Euler().setFromQuaternion(quat);
-
-		console.log('dropped local pos:', pos.toArray());
+		rot.setFromQuaternion(quat);
+		rot = rot.toVector3().multiplyScalar(180/Math.PI);
 
 		this.el.setAttribute('position', pos);
 		this.el.setAttribute('rotation', rot);
