@@ -34,8 +34,6 @@ html
 					+ 'mixins: highrise_spot,exhibition_spot,conference_spot,lodge_spot,parlor_spot;'
 			a-entity#spawn-complex(place-for-space=pfs)
 
-				a-sphere(radius='.005')
-
 				a-entity#spawn_point(position='1 .55 0')
 					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
 					a-gltf-model#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', spawner,
@@ -67,5 +65,10 @@ html
 				altspace-cursor-collider='enabled: false', collision='with: #spawn,.decoration; kinematic: true')
 			a-sphere#righthand(radius=.005, altspace-controls='right', grab-indicator,
 				altspace-cursor-collider='enabled: false', collision='with: #spawn,.decoration; kinematic: true')
+
+			if !production
+				script.
+					window.spawn = document.getElementById('spawn');
+					window.spinner = document.getElementById('spinner');
 
 			a-entity(position='0 0 2'): a-camera: a-cursor

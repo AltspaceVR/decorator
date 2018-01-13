@@ -35,4 +35,24 @@ function set_difference(a, b)
 	return diff;
 }
 
-export {loadFile, mapProperties, setAttributes, obj2array, set_difference}
+let pos = new AFRAME.THREE.Vector3(),
+	quat = new AFRAME.THREE.Quaternion(),
+	scale = new AFRAME.THREE.Vector3();
+
+function setLocalTransform(el, newTransform)
+{
+	// compute spawn point position
+	newTransform.decompose(pos, quat, scale);
+
+	// position at spawn point
+	el.setAttribute('position', pos);
+	el.setAttribute('quaternion', quat);
+	el.setAttribute('scale', scale);
+}
+
+function arrayDeepEquals(a, b)
+{
+	return a && b && a.length === b.length && a.every((x,i) => x === b[i]);
+}
+
+export {loadFile, mapProperties, setAttributes, obj2array, set_difference, setLocalTransform, arrayDeepEquals}

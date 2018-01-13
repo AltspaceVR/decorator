@@ -1,6 +1,6 @@
 import DoubleMap from './double-map';
 import includes from 'core-js/fn/array/includes';
-import {set_difference} from './utils';
+import {set_difference, arrayDeepEquals} from './utils';
 import AmmoPool from './ammo-pool';
 
 /* Useful guide: http://hamelot.io/programming/using-bullet-only-for-collision-detection/ */
@@ -95,7 +95,8 @@ AFRAME.registerSystem('collision',
 		let hits = new Set();
 		for(let i=0; i<hitCount; i++){
 			let manifold = dispatcher.getManifoldByIndexInternal(i);
-			hits.add(manifold);
+			if(manifold.getNumContacts() > 0)
+				hits.add(manifold);
 		}
 
 		try {
@@ -107,11 +108,9 @@ AFRAME.registerSystem('collision',
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
 			if(!el1 || !el2) continue;
 
-			console.log(el1.getAttribute('collision').with, el2.getAttribute('collision').with);
 			let el1targets = el1.getAttribute('collision').with, el2targets = el2.getAttribute('collision').with;
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
-				console.log('collision start');
 				el2.emit('collision-start', el1, false);
 				el1.emit('collision-start', el2, false);
 			}
@@ -133,7 +132,6 @@ AFRAME.registerSystem('collision',
 			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
-				console.log('collision end');
 				el2.emit('collision-end', el1, false);
 				el1.emit('collision-end', el2, false);
 			}
@@ -204,10 +202,20 @@ AFRAME.registerSystem('collision',
 
 AFRAME.registerComponent('collision', {
 	schema: {
-		with: {type: 'selectorAll'},
+		with: {
+			default: [],
+			parse: function(value){
+				if (!value) { return null; }
+				if (typeof value !== 'string') { return value; }
+
+				let sel = value.split(',').map(x => `${x}[collision]`).join(',');
+				return Array.prototype.slice.call(document.querySelectorAll(sel), 0);
+			}
+		},
 		kinematic: {type: 'boolean', default: false}
 	},
-	init: function(){
+	init: function()
+	{
 		if(this.el.object3DMap.mesh)
 			this.updateBounds();
 		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
@@ -216,6 +224,15 @@ AFRAME.registerComponent('collision', {
 		// one last late update when kinematic stops
 		if(oldData.kinematic && !this.data.kinematic)
 			this.system.forceUpdateTransform(this.el);
+
+		if(!arrayDeepEquals(oldData.with, this.data.with))
+		{
+			for(let el of this.data.with){
+				if(el !== this.el && el.components.collision){
+					el.components.collision.updateProperties();
+				}
+			}
+		}
 	},
 	updateBounds: function(){
 		//if(this.el.id === 'spawn') console.log('updateBounds');

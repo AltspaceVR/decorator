@@ -12,3 +12,4 @@ import './collision';
 import './grab-indicator';
 import './spawner';
 import './set-from-data';
+import './quaternion';

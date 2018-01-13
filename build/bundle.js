@@ -2658,6 +2658,26 @@ function set_difference(a, b) {
 	return diff;
 }
 
+var pos = new AFRAME.THREE.Vector3();
+var quat = new AFRAME.THREE.Quaternion();
+var scale = new AFRAME.THREE.Vector3();
+
+function setLocalTransform(el, newTransform) {
+	// compute spawn point position
+	newTransform.decompose(pos, quat, scale);
+
+	// position at spawn point
+	el.setAttribute('position', pos);
+	el.setAttribute('quaternion', quat);
+	el.setAttribute('scale', scale);
+}
+
+function arrayDeepEquals(a, b) {
+	return a && b && a.length === b.length && a.every(function (x, i) {
+		return x === b[i];
+	});
+}
+
 AFRAME.registerSystem('poly-service', {
 	schema: {
 		key: { type: 'string' }
@@ -2976,20 +2996,35 @@ AFRAME.registerComponent('altspace-controls', {
 	}
 });
 
+var mat = new AFRAME.THREE.Matrix4();
 AFRAME.registerComponent('grabbable', {
 	schema: {
-		enabled: { default: true },
-		dropTarget: { type: 'selector', default: '#decorations' }
+		enabled: { default: true }
 	},
 	init: function init() {
+		this.grabber = null;
+		this.localTransform = new AFRAME.THREE.Matrix4();
+
+		// pre-bound event handlers
 		this._hoverStart = this.hoverStart.bind(this);
 		this._pickup = this.pickup.bind(this);
 		this._drop = this.drop.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 
-		if (this.el.dataset.spawned) {
-			this.el.parentElement.addEventListener('gripup', this._drop);
-			this.el.removeAttribute('data-spawned');
+		// set initial transform and grabber from data attributes
+		if (this.el.dataset.spawnedby && this.el.dataset.spawnedto) {
+			var spawner = document.getElementById(this.el.dataset.spawnedby);
+			var target = document.getElementById(this.el.dataset.spawnedto);
+
+			spawner.object3D.updateMatrixWorld(true);
+			this.el.object3D.updateMatrixWorld(true);
+			mat.getInverse(this.el.object3D.matrixWorld).multiply(spawner.object3D.matrixWorld);
+			setLocalTransform(this.el, mat);
+
+			this.pickup({ detail: target });
+
+			this.el.removeAttribute('data-spawnedby');
+			this.el.removeAttribute('data-spawnedto');
 		}
 	},
 	update: function update() {
@@ -3009,38 +3044,34 @@ AFRAME.registerComponent('grabbable', {
 	pickup: function pickup(_ref2) {
 		var hand = _ref2.detail;
 
+		this.grabber = hand;
 
-		this.el.addEventListener('gripup', this._drop);
+		// the transform of the object in hand space
+		hand.object3D.updateMatrixWorld(true);
+		this.el.object3D.updateMatrixWorld(true);
+		this.localTransform.getInverse(hand.object3D.matrixWorld).multiply(this.el.object3D.matrixWorld);
+
+		this.el.setAttribute('collision', 'kinematic', true);
+		hand.addEventListener('gripup', this._drop);
 	},
 	drop: function drop(_ref3) {
 		var hand = _ref3.detail;
 
-		// set transform
-		this.data.dropTarget.object3D.updateMatrixWorld(true);
-		this.el.object3D.updateMatrixWorld(true);
-
-		// set transform
-		var mat = new AFRAME.THREE.Matrix4().getInverse(this.data.dropTarget.object3D.matrixWorld).multiply(this.el.object3D.matrixWorld),
-		    pos = new AFRAME.THREE.Vector3(),
-		    quat = new AFRAME.THREE.Quaternion(),
-		    rot = new AFRAME.THREE.Euler(),
-		    scale = new AFRAME.THREE.Vector3();
-		mat.decompose(pos, quat, scale);
-		rot.setFromQuaternion(quat);
-		rot = rot.toVector3().multiplyScalar(180 / Math.PI);
-
-		this.el.setAttribute('position', pos);
-		this.el.setAttribute('rotation', rot);
-		this.el.setAttribute('scale', scale);
-
-		this.data.dropTarget.appendChild(this.el);
-		this.el.setAttribute('collision', 'kinematic', false);
-		console.log('drop finished');
+		if (this.grabber === hand) {
+			this.grabber = null;
+			this.el.setAttribute('collision', 'kinematic', false);
+		}
 	},
 	hoverEnd: function hoverEnd(_ref4) {
 		var hand = _ref4.detail;
 
 		hand.removeEventListener('gripdown', this._pickup);
+	},
+	tick: function tick() {
+		if (this.grabber) {
+			this.grabber.object3D.updateMatrixWorld(true);
+			setLocalTransform(this.el, mat.getInverse(this.el.object3D.parent.matrixWorld).multiply(this.grabber.object3D.matrixWorld).multiply(this.localTransform));
+		}
 	}
 });
 
@@ -3791,7 +3822,7 @@ AFRAME.registerSystem('collision', {
 		var hits = new _Set();
 		for (var i = 0; i < hitCount; i++) {
 			var manifold = dispatcher.getManifoldByIndexInternal(i);
-			hits.add(manifold);
+			if (manifold.getNumContacts() > 0) hits.add(manifold);
 		}
 
 		try {
@@ -3811,11 +3842,9 @@ AFRAME.registerSystem('collision', {
 					    el2 = this.el2co.getA(co2);
 					if (!el1 || !el2) continue;
 
-					console.log(el1.getAttribute('collision').with, el2.getAttribute('collision').with);
 					var el1targets = el1.getAttribute('collision').with,
 					    el2targets = el2.getAttribute('collision').with;
 					if (el1targets.includes(el2) && el2targets.includes(el1)) {
-						console.log('collision start');
 						el2.emit('collision-start', el1, false);
 						el1.emit('collision-start', el2, false);
 					}
@@ -3858,7 +3887,6 @@ AFRAME.registerSystem('collision', {
 					var _el1targets = [].concat(_toConsumableArray(_el.getAttribute('collision').with)),
 					    _el2targets = [].concat(_toConsumableArray(_el2.getAttribute('collision').with));
 					if (_el1targets.includes(_el2) && _el2targets.includes(_el)) {
-						console.log('collision end');
 						_el2.emit('collision-end', _el, false);
 						_el.emit('collision-end', _el2, false);
 					}
@@ -3934,7 +3962,22 @@ AFRAME.registerSystem('collision', {
 
 AFRAME.registerComponent('collision', {
 	schema: {
-		with: { type: 'selectorAll' },
+		with: {
+			default: [],
+			parse: function parse(value) {
+				if (!value) {
+					return null;
+				}
+				if (typeof value !== 'string') {
+					return value;
+				}
+
+				var sel = value.split(',').map(function (x) {
+					return x + '[collision]';
+				}).join(',');
+				return Array.prototype.slice.call(document.querySelectorAll(sel), 0);
+			}
+		},
 		kinematic: { type: 'boolean', default: false }
 	},
 	init: function init() {
@@ -3944,6 +3987,35 @@ AFRAME.registerComponent('collision', {
 	update: function update(oldData) {
 		// one last late update when kinematic stops
 		if (oldData.kinematic && !this.data.kinematic) this.system.forceUpdateTransform(this.el);
+
+		if (!arrayDeepEquals(oldData.with, this.data.with)) {
+			var _iteratorNormalCompletion3 = true;
+			var _didIteratorError3 = false;
+			var _iteratorError3 = undefined;
+
+			try {
+				for (var _iterator3 = _getIterator(this.data.with), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+					var el = _step3.value;
+
+					if (el !== this.el && el.components.collision) {
+						el.components.collision.updateProperties();
+					}
+				}
+			} catch (err) {
+				_didIteratorError3 = true;
+				_iteratorError3 = err;
+			} finally {
+				try {
+					if (!_iteratorNormalCompletion3 && _iterator3.return) {
+						_iterator3.return();
+					}
+				} finally {
+					if (_didIteratorError3) {
+						throw _iteratorError3;
+					}
+				}
+			}
+		}
 	},
 	updateBounds: function updateBounds() {
 		//if(this.el.id === 'spawn') console.log('updateBounds');
@@ -3976,7 +4048,8 @@ AFRAME.registerComponent('grab-indicator', {
 
 AFRAME.registerComponent('spawner', {
 	schema: {
-		enabled: { default: true }
+		enabled: { default: true },
+		spawnTarget: { type: 'selector', default: '#decorations' }
 	},
 	init: function init() {
 		this._hoverStart = this.hoverStart.bind(this);
@@ -4039,39 +4112,19 @@ AFRAME.registerComponent('spawner', {
 			child.classList.add('decoration');
 			child.setAttribute('mixin', 'model');
 			child.setAttribute('data-src', _this.el.getAttribute('gltf-model'));
-			child.setAttribute('data-spawned', 'true');
-			child.setAttribute('grabbable', { enabled: false });
-			child.setAttribute('collision', { with: '#lefthand,#righthand', kinematic: true });
-			target.appendChild(child);
+			child.setAttribute('data-spawnedby', _this.el.id);
+			child.setAttribute('data-spawnedto', target.id);
+			child.setAttribute('grabbable', { enabled: true });
+			child.setAttribute('collision', { with: '#lefthand,#righthand' });
+			_this.data.spawnTarget.appendChild(child);
 
-			_this.el.object3D.updateMatrixWorld(true);
-			target.object3D.updateMatrixWorld(true);
-			console.log('target pos:', target.object3D.getWorldPosition().toArray());
-			console.log('entity pos:', _this.el.object3D.getWorldPosition().toArray());
-
-			// set transform
-			var mat = new AFRAME.THREE.Matrix4().getInverse(target.object3D.matrixWorld).multiply(_this.el.object3D.matrixWorld),
-			    pos = new AFRAME.THREE.Vector3(),
-			    quat = new AFRAME.THREE.Quaternion(),
-			    rot = new AFRAME.THREE.Euler(),
-			    scale = new AFRAME.THREE.Vector3();
-			mat.decompose(pos, quat, scale);
-			rot.setFromQuaternion(quat, 'XYZ');
-			rot = rot.toVector3().multiplyScalar(180 / Math.PI);
-
-			console.log('relative pos:', pos.toArray());
-
-			child.setAttribute('position', pos);
-			child.setAttribute('rotation', rot);
-			child.setAttribute('scale', scale);
-
+			// disable this spawner until the hand clears the collider
 			_this.el.setAttribute('spawner', 'enabled', false);
 		};
 	},
 	hoverEnd: function hoverEnd(_ref4) {
 		var target = _ref4.detail;
 
-		console.log('hover end');
 		target.removeEventListener('gripdown', this.handlers.get(target));
 		this.handlers.delete(target);
 		this.el.setAttribute('spawner', 'enabled', true);
@@ -4088,6 +4141,15 @@ AFRAME.registerComponent('set-from-data', {
 		var _el;
 
 		(_el = this.el).setAttribute.apply(_el, _toConsumableArray(this.data.to).concat([this.el.dataset[this.data.from]]));
+	}
+});
+
+AFRAME.registerComponent('quaternion', {
+	schema: { type: 'vec4' },
+	update: function update() {
+		//this.el.object3D.quaternion.copy(this.data);
+		var e = new AFRAME.THREE.Euler().setFromQuaternion(this.data, 'YZX').toVector3().multiplyScalar(180 / Math.PI);
+		this.el.setAttribute('rotation', e);
 	}
 });
 

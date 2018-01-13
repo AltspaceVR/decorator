@@ -39,40 +39,18 @@ AFRAME.registerComponent('spawner', {
 			child.classList.add('decoration');
 			child.setAttribute('mixin', 'model');
 			child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
-			child.setAttribute('data-spawned', 'true');
-			child.setAttribute('grabbable', {enabled: false});
-			child.setAttribute('collision', {with: '#lefthand,#righthand', kinematic: true});
-			target.appendChild(child);
+			child.setAttribute('data-spawnedby', this.el.id);
+			child.setAttribute('data-spawnedto', target.id);
+			child.setAttribute('grabbable', {enabled: true});
+			child.setAttribute('collision', {with: '#lefthand,#righthand'});
+			this.data.spawnTarget.appendChild(child);
 
-			this.el.object3D.updateMatrixWorld(true);
-			target.object3D.updateMatrixWorld(true);
-			console.log('target pos:', target.object3D.getWorldPosition().toArray());
-			console.log('entity pos:', this.el.object3D.getWorldPosition().toArray());
-
-			// set transform
-			let mat = new AFRAME.THREE.Matrix4()
-				.getInverse(target.object3D.matrixWorld)
-				.multiply(this.el.object3D.matrixWorld),
-				pos = new AFRAME.THREE.Vector3(),
-				quat = new AFRAME.THREE.Quaternion(),
-				rot = new AFRAME.THREE.Euler(),
-				scale = new AFRAME.THREE.Vector3();
-			mat.decompose(pos, quat, scale);
-			rot.setFromQuaternion(quat, 'XYZ');
-			rot = rot.toVector3().multiplyScalar(180/Math.PI);
-
-			console.log('relative pos:', pos.toArray());
-
-			child.setAttribute('position', pos);
-			child.setAttribute('rotation', rot);
-			child.setAttribute('scale', scale);
-
+			// disable this spawner until the hand clears the collider
 			this.el.setAttribute('spawner', 'enabled', false);
 		};
 	},
 	hoverEnd: function({detail: target})
 	{
-		console.log('hover end');
 		target.removeEventListener('gripdown', this.handlers.get(target));
 		this.handlers.delete(target);
 		this.el.setAttribute('spawner', 'enabled', true);
