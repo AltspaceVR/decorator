@@ -36,13 +36,10 @@ AFRAME.registerComponent('spawner', {
 
 			// create new model
 			let child = document.createElement('a-entity');
-			child.classList.add('decoration');
-			child.setAttribute('mixin', 'model');
+			child.setAttribute('mixin', 'decoration model');
 			child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
 			child.setAttribute('data-spawnedby', this.el.id);
 			child.setAttribute('data-spawnedto', target.id);
-			child.setAttribute('grabbable', {enabled: true});
-			child.setAttribute('collision', {with: '#lefthand,#righthand'});
 			this.data.spawnTarget.appendChild(child);
 
 			// disable this spawner until the hand clears the collider

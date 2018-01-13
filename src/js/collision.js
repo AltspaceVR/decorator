@@ -220,7 +220,8 @@ AFRAME.registerComponent('collision', {
 			this.updateBounds();
 		this.el.addEventListener('model-loaded', this.updateBounds.bind(this));
 	},
-	update: function(oldData){
+	update: function(oldData)
+	{
 		// one last late update when kinematic stops
 		if(oldData.kinematic && !this.data.kinematic)
 			this.system.forceUpdateTransform(this.el);
@@ -228,7 +229,7 @@ AFRAME.registerComponent('collision', {
 		if(!arrayDeepEquals(oldData.with, this.data.with))
 		{
 			for(let el of this.data.with){
-				if(el !== this.el && el.components.collision){
+				if(el !== this.el && el.components && el.components.collision){
 					el.components.collision.updateProperties();
 				}
 			}

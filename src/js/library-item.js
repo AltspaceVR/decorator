@@ -9,7 +9,7 @@ AFRAME.registerComponent('library-item',
 		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
 
-		this.el.addEventListener('click', this.previewModel.bind(this));
+		this.el.addEventListener('click', this.previewItem.bind(this));
 	},
 	showLoading: function()
 	{
@@ -38,10 +38,10 @@ AFRAME.registerComponent('library-item',
 			this.el.setAttribute('color', '#fff');
 	},
 
-	previewModel: function()
+	previewItem: function()
 	{
 		let spawn = document.querySelector('#spawn');
 		let gltfUrls = this.itemData.formats.filter(x => x.formatType === 'GLTF2');
-		spawn.setAttribute('src', gltfUrls[0].root.url);
+		spawn.setAttribute('gltf-model', gltfUrls[0].root.url);
 	}
 });
