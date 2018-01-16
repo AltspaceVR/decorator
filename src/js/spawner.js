@@ -1,7 +1,7 @@
 AFRAME.registerComponent('spawner', {
 	schema: {
 		enabled: {default: true},
-		spawnTarget: {type: 'selector', default: '#decorations'}
+		spawnTarget: {type: 'selector', default: '#decor'}
 	},
 	init: function()
 	{
@@ -35,12 +35,18 @@ AFRAME.registerComponent('spawner', {
 		return () => {
 
 			// create new model
-			let child = document.createElement('a-entity');
-			child.setAttribute('mixin', 'decoration model');
+			/*let child = document.createElement('a-entity');
+			child.id = key;
+			child.setAttribute('mixin', 'decoration');
 			child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
 			child.setAttribute('data-spawnedby', this.el.id);
 			child.setAttribute('data-spawnedto', target.id);
-			this.data.spawnTarget.appendChild(child);
+			this.data.spawnTarget.appendChild(child);*/
+
+			this.data.spawnTarget.components['decor-sync'].instantiate(
+				'model-gltf',
+				this.el.getAttribute('gltf-model')
+			);
 
 			// disable this spawner until the hand clears the collider
 			this.el.setAttribute('spawner', 'enabled', false);

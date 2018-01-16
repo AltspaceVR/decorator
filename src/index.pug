@@ -23,8 +23,8 @@ html
 			a-assets
 				a-asset-item#pedestal_model(src='build/pedestal.gltf')
 
-				a-mixin#model(gltf-model, set-from-data='from: src; to: gltf-model;')
-				a-mixin#decoration(class='decoration', collision='with: #lefthand,#righthand', grabbable='enabled: true')
+				a-mixin#decoration(class='decoration', collision='with: #lefthand,#righthand', grabbable='enabled: true',
+					sync='ownOn: gripdown')
 
 				a-mixin#highrise_spot(position='8 0.5 2.8', rotation='0 180 0')
 				a-mixin#exhibition_spot(position='7.6 0.5 -4')
@@ -62,7 +62,7 @@ html
 						library-advance='1')
 						a-entity(position=`0 0 ${size/20 + .001}` n-text='text: Next; font-size: 1')
 
-			a-entity#decorations
+			a-entity#decor(decor-sync)
 
 			a-sphere#lefthand(radius=.005, altspace-controls='left', grab-indicator,
 				altspace-cursor-collider='enabled: false', collision='with: #spawn,.decoration; kinematic: true')
