@@ -76,9 +76,6 @@ AFRAME.registerComponent('spawner', {
 				ownerRef = entityRef.child('owner'),
 				dataRef = entityRef.child('data');
 
-			// assign initial owner
-			ownerRef.set(this.syncSys.clientId);
-
 			// compute new local transform matrix
 			this.data.spawnTarget.object3D.updateMatrixWorld(true);
 			this.el.object3D.updateMatrixWorld(true);
@@ -98,6 +95,14 @@ AFRAME.registerComponent('spawner', {
 			dataRef.child('position').set(pos.toArray().join(' '));
 			dataRef.child('rotation').set(rot.toArray().join(' '));
 			dataRef.child('scale').set(scale.toArray().join(' '));
+
+			// assign initial owner
+			ownerRef.set(this.syncSys.clientId);
+
+			// assign model properties
+			dataRef.child('type').set(this.activeItem.type);
+			dataRef.child('srcUrl').set(this.activeItem.srcUrl);
+			dataRef.child('moreInfoUrl').set(this.activeItem.moreInfoUrl);
 			
 			// disable this spawner until the hand clears the collider
 			this.el.setAttribute('spawner', 'enabled', false);

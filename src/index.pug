@@ -23,8 +23,9 @@ html
 			a-assets
 				a-asset-item#pedestal_model(src='build/pedestal.gltf')
 
-				a-mixin#decoration(class='decoration', collision='with: #lefthand,#righthand', grabbable='enabled: true',
-					sync='ownOn: gripdown', sync-transform, sync-src)
+				a-mixin#decoration(class='decoration', sync='ownOn: gripdown', sync-transform, sync-src, if-mod='moddeco')
+				a-mixin#moddeco(collision='with: #lefthand,#righthand', grabbable='enabled: true')
+				a-mixin#modspawn(collision='with: #lefthand,#righthand', spawner)
 
 				a-mixin#highrise_spot(position='8 0.5 2.8', rotation='0 180 0')
 				a-mixin#exhibition_spot(position='7.6 0.5 -4')
@@ -39,8 +40,8 @@ html
 
 				a-entity#spawn_point(position='1 .55 0')
 					a-gltf-model(position='0 -.5 0' src='#pedestal_model', altspace-cursor-collider='enabled: false')
-					a-entity#spawn(maintain-size='1 1 1', collision='with: #lefthand,#righthand', spawner,
-						src=!production && 'https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
+					a-entity#spawn(maintain-size='1 1 1', if-mod='modspawn',
+						gltf-model=!production && 'https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf')
 					//a-box#eventtest(position='0 0 1', collision='with: #lefthand,#righthand', grabbable)
 
 				a-entity#spawn_menu(position='-1 1 0' library-page='service: poly; page: 0')
