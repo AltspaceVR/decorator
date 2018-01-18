@@ -8,6 +8,9 @@ AFRAME.registerComponent('spawner', {
 		this._hoverStart = this.hoverStart.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 		this.handlers = new Map();
+
+		this.syncSys = this.el.sceneEl.systems['sync-system'];
+		this.activeItem = null;
 	},
 	update: function()
 	{
@@ -43,11 +46,59 @@ AFRAME.registerComponent('spawner', {
 			child.setAttribute('data-spawnedto', target.id);
 			this.data.spawnTarget.appendChild(child);*/
 
-			this.data.spawnTarget.components['decor-sync'].instantiate(
-				'model-gltf',
-				this.el.getAttribute('gltf-model')
-			);
+			/*this.data.spawnTarget.components['decor-sync'].instantiate(
+				this.activeItem.type,
+				this.activeItem.srcUrl,
+				this.activeItem.moreInfoUrl
+			);*/
 
+			if (!this.syncSys.isConnected) {
+				console.error('Spawner: sync system not yet connected, cannot spawn.');
+				return;
+			}
+
+			/*
+			This is copy-pasted from the source code for sync-system#instantiate with minor changes
+			*/
+			let instantiationProps = {
+				instantiatorId: '',
+				groupName: 'main',
+				mixin: 'decoration',
+				parent: this.attrValue.spawnTarget,
+				creatorUserId: this.syncSys.userInfo.userId,
+				clientId: this.syncSys.clientId
+			};
+			
+			let instance = this.syncSys.instantiatedElementsRef
+				.child(instantiationProps.groupName).push(instantiationProps);
+
+			let entityRef = this.syncSys.sceneRef.child(instance.key()),
+				ownerRef = entityRef.child('owner'),
+				dataRef = entityRef.child('data');
+
+			// assign initial owner
+			ownerRef.set(this.syncSys.clientId);
+
+			// compute new local transform matrix
+			this.data.spawnTarget.object3D.updateMatrixWorld(true);
+			this.el.object3D.updateMatrixWorld(true);
+			let mat = new AFRAME.THREE.Matrix4()
+				.getInverse(this.data.spawnTarget.object3D.matrixWorld)
+				.multiply(this.el.object3D.matrixWorld);
+			
+			// extract to transform data
+			let pos = new AFRAME.THREE.Vector3(),
+				quat = new AFRAME.THREE.Quaternion(),
+				rot = new AFRAME.THREE.Euler(),
+				scale = new AFRAME.THREE.Vector3();
+			mat.decompose(pos, quat, scale);
+			rot = rot.setFromQuaternion(quat).toVector3().multiplyScalar(180/Math.PI);
+
+			// set sync initial position
+			dataRef.child('position').set(pos.toArray().join(' '));
+			dataRef.child('rotation').set(rot.toArray().join(' '));
+			dataRef.child('scale').set(scale.toArray().join(' '));
+			
 			// disable this spawner until the hand clears the collider
 			this.el.setAttribute('spawner', 'enabled', false);
 		};
@@ -57,5 +108,11 @@ AFRAME.registerComponent('spawner', {
 		target.removeEventListener('gripdown', this.handlers.get(target));
 		this.handlers.delete(target);
 		this.el.setAttribute('spawner', 'enabled', true);
+	},
+	setSpawn: function(type, srcUrl, moreInfoUrl)
+	{
+		this.activeItem = {type, srcUrl, moreInfoUrl};
+		if(type === 'model-gltf')
+			this.el.setAttribute('gltf-model', srcUrl);
 	}
 });

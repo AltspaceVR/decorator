@@ -14,3 +14,4 @@ import './spawner';
 import './set-from-data';
 import './quaternion';
 import './decor-sync';
+import './sync-src';

@@ -1,6 +1,7 @@
 import {setLocalTransform} from './utils';
 
 let mat = new AFRAME.THREE.Matrix4();
+
 AFRAME.registerComponent('grabbable', {
 	schema: {
 		enabled: {default: true}
