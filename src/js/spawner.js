@@ -1,3 +1,5 @@
+import {objFromKeys} from './utils';
+
 AFRAME.registerComponent('spawner', {
 	schema: {
 		enabled: {default: true},
@@ -11,6 +13,12 @@ AFRAME.registerComponent('spawner', {
 
 		this.syncSys = this.el.sceneEl.systems['sync-system'];
 		this.activeItem = null;
+		if(this.el.sceneEl.hasAttribute('debug')){
+			this.setSpawn('model-gltf',
+				'https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf',
+				'https://poly.google.com/view/428MKgODp0H'
+			);
+		}
 	},
 	update: function()
 	{
@@ -36,7 +44,6 @@ AFRAME.registerComponent('spawner', {
 	spawn: function(target)
 	{
 		return () => {
-
 			// create new model
 			/*let child = document.createElement('a-entity');
 			child.id = key;
@@ -64,7 +71,7 @@ AFRAME.registerComponent('spawner', {
 				instantiatorId: '',
 				groupName: 'main',
 				mixin: 'decoration',
-				parent: this.attrValue.spawnTarget,
+				parent: this.attrValue.spawnTarget || '#decor',
 				creatorUserId: this.syncSys.userInfo.userId,
 				clientId: this.syncSys.clientId
 			};
@@ -72,7 +79,7 @@ AFRAME.registerComponent('spawner', {
 			let instance = this.syncSys.instantiatedElementsRef
 				.child(instantiationProps.groupName).push(instantiationProps);
 
-			let entityRef = this.syncSys.sceneRef.child(instance.key()),
+			let entityRef = this.syncSys.sceneRef.child('main-instance-'+instance.key()),
 				ownerRef = entityRef.child('owner'),
 				dataRef = entityRef.child('data');
 
@@ -92,12 +99,9 @@ AFRAME.registerComponent('spawner', {
 			rot = rot.setFromQuaternion(quat).toVector3().multiplyScalar(180/Math.PI);
 
 			// set sync initial position
-			dataRef.child('position').set(pos.toArray().join(' '));
-			dataRef.child('rotation').set(rot.toArray().join(' '));
-			dataRef.child('scale').set(scale.toArray().join(' '));
-
-			// assign initial owner
-			ownerRef.set(this.syncSys.clientId);
+			dataRef.child('position').set(objFromKeys(pos, ['x','y','z']));
+			dataRef.child('rotation').set(objFromKeys(rot, ['x','y','z']));
+			dataRef.child('scale').set(objFromKeys(scale, ['x','y','z']));
 
 			// assign model properties
 			dataRef.child('type').set(this.activeItem.type);

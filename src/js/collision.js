@@ -202,15 +202,15 @@ AFRAME.registerSystem('collision',
 
 AFRAME.registerComponent('collision', {
 	schema: {
-		with: {
-			default: [],
+		with: {type: 'selectorAll'
+			/*default: [],
 			parse: function(value){
 				if (!value) { return null; }
 				if (typeof value !== 'string') { return value; }
 
 				let sel = value.split(',').map(x => `${x}[collision]`).join(',');
 				return Array.prototype.slice.call(document.querySelectorAll(sel), 0);
-			}
+			}*/
 		},
 		kinematic: {type: 'boolean', default: false}
 	},

@@ -55,4 +55,9 @@ function arrayDeepEquals(a, b)
 	return a && b && a.length === b.length && a.every((x,i) => x === b[i]);
 }
 
-export {loadFile, mapProperties, setAttributes, obj2array, set_difference, setLocalTransform, arrayDeepEquals}
+function objFromKeys(src, keys)
+{
+	return keys.reduce((dest, k) => {dest[k] = src[k]; return dest;}, {});
+}
+
+export {loadFile, mapProperties, setAttributes, obj2array, set_difference, setLocalTransform, arrayDeepEquals, objFromKeys}

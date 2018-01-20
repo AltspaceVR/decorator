@@ -3,16 +3,18 @@ AFRAME.registerComponent('if-mod', {
 	init: function()
 	{
 		let syncSys = this.el.sceneEl.systems['sync-system'];
-		if(syncSys.connected){
+		let evaluateModStatus = (function(){
+			if(syncSys.userInfo.isModerator)
+				this.el.setAttribute('mixin', this.data + ' ' + this.el.getAttribute('mixin'));
+		}).bind(this);
+
+		if(syncSys.isConnected){
 			evaluateModStatus();
 		}
 		else {
 			this.el.sceneEl.addEventListener('connected', evaluateModStatus);
 		}
 
-		let evaluateModStatus = (function(){
-			if(syncSys.userInfo.isModerator)
-				this.el.setAttribute('mixin', this.data + ' ' + this.el.getAttribute('mixin'));
-		}).bind(this);
+		
 	}
 });

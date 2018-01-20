@@ -5,6 +5,7 @@ AFRAME.registerComponent('library-item',
 	{
 		this.itemData = null;
 		
+
 		this.el.parentElement.addEventListener('pageupdatestart', this.showLoading.bind(this));
 		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
@@ -42,6 +43,12 @@ AFRAME.registerComponent('library-item',
 	{
 		let spawn = document.querySelector('#spawn');
 		let gltfUrls = this.itemData.formats.filter(x => x.formatType === 'GLTF2');
-		spawn.setAttribute('gltf-model', gltfUrls[0].root.url);
+		let polyId = 
+
+		spawn.components.spawner.setSpawn(
+			'model-gltf',
+			gltfUrls[0].root.url,
+			`https://poly.google.com/view/${this.itemData.name.slice(7)}`
+		);
 	}
 });
