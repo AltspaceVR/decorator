@@ -24,7 +24,7 @@ html
 				a-asset-item#pedestal_model(src='build/pedestal.gltf')
 
 				a-mixin#decoration(class='decoration', sync='ownOn: gripdown', sync-transform, sync-src, if-mod='moddeco')
-				a-mixin#moddeco(collision='with: #lefthand,#righthand', grabbable='enabled: true')
+				a-mixin#moddeco(collision='with: #lefthand,#righthand; kinematic: true', grabbable='enabled: true')
 				a-mixin#modspawn(collision='with: #lefthand,#righthand', spawner)
 
 				a-mixin#highrise_spot(position='8 0.5 2.8', rotation='0 180 0')

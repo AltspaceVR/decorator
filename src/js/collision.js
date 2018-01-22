@@ -104,17 +104,13 @@ AFRAME.registerSystem('collision',
 		let newHits = set_difference(hits, this.manifolds);
 		for(let manifold of newHits)
 		{
-			console.log('new hit!');
 			let co1 = manifold.getBody0(), co2 = manifold.getBody1();
 			let el1 = this.el2co.getA(co1), el2 = this.el2co.getA(co2);
 			if(!el1 || !el2) continue;
 
-			console.log('valid hit');
 			let el1targets = el1.getAttribute('collision').with, el2targets = el2.getAttribute('collision').with;
-			console.log(el1targets.map(x => x.id), el2targets.map(x => x.id));
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
-				console.log('collision-start', el1.id, el2.id);
 				el2.emit('collision-start', el1, false);
 				el1.emit('collision-start', el2, false);
 			}
@@ -136,7 +132,6 @@ AFRAME.registerSystem('collision',
 			let el1targets = [...el1.getAttribute('collision').with], el2targets = [...el2.getAttribute('collision').with];
 			if(el1targets.includes(el2) && el2targets.includes(el1))
 			{
-				console.log('hit end');
 				el2.emit('collision-end', el1, false);
 				el1.emit('collision-end', el2, false);
 			}
