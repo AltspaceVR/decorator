@@ -80,7 +80,6 @@ AFRAME.registerComponent('spawner', {
 				.child(instantiationProps.groupName).push(instantiationProps);
 
 			let entityRef = this.syncSys.sceneRef.child('main-instance-'+instance.key()),
-				ownerRef = entityRef.child('owner'),
 				dataRef = entityRef.child('data');
 
 			// compute new local transform matrix
@@ -107,6 +106,10 @@ AFRAME.registerComponent('spawner', {
 			dataRef.child('type').set(this.activeItem.type);
 			dataRef.child('srcUrl').set(this.activeItem.srcUrl);
 			dataRef.child('moreInfoUrl').set(this.activeItem.moreInfoUrl);
+
+			// assign grab properties
+			dataRef.child('spawnClient').set(this.syncSys.clientId);
+			dataRef.child('grabber').set(target.id);
 			
 			// disable this spawner until the hand clears the collider
 			this.el.setAttribute('spawner', 'enabled', false);

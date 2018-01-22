@@ -3,6 +3,7 @@ import {setLocalTransform} from './utils';
 let mat = new AFRAME.THREE.Matrix4();
 
 AFRAME.registerComponent('grabbable', {
+	dependencies: ['sync'],
 	schema: {
 		enabled: {default: true}
 	},
@@ -17,23 +18,11 @@ AFRAME.registerComponent('grabbable', {
 		this._drop = this.drop.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 
-		// set initial transform and grabber from data attributes
-		if(this.el.dataset.spawnedby && this.el.dataset.spawnedto)
-		{
-			let spawner = document.getElementById(this.el.dataset.spawnedby);
-			let target = document.getElementById(this.el.dataset.spawnedto);
-
-			spawner.object3D.updateMatrixWorld(true);
-			this.el.object3D.updateMatrixWorld(true);
-			mat.getInverse(this.el.object3D.matrixWorld)
-				.multiply(spawner.object3D.matrixWorld);
-			setLocalTransform(this.el, mat);
-
-			this.pickup({detail: target});
-
-			this.el.removeAttribute('data-spawnedby');
-			this.el.removeAttribute('data-spawnedto');
-		}
+		this.sync = this.el.components.sync;
+		if(this.sync.isConnected)
+			this.spawnPickup();
+		else
+			this.el.addEventListener('connected', this.spawnPickup.bind(this));
 	},
 	update: function()
 	{
@@ -85,6 +74,27 @@ AFRAME.registerComponent('grabbable', {
 				.multiply(this.grabber.object3D.matrixWorld)
 				.multiply(this.localTransform)
 			);
+		}
+	},
+	spawnPickup: function()
+	{
+		let self = this,
+			syncSys = this.el.sceneEl.systems['sync-system'];
+
+		self.sync.dataRef.child('spawnClient').on('value', checkSpawnClient);
+		function checkSpawnClient(snapshot)
+		{
+			if(snapshot.val() === syncSys.clientId){
+				self.sync.dataRef.child('grabber').on('value', assignGrabHand);
+			}
+		}
+
+		function assignGrabHand(snapshot)
+		{
+			let hand = document.getElementById(snapshot.val());
+			self.pickup({detail: hand});
+			self.sync.dataRef.child('spawnClient').remove();
+			self.sync.dataRef.child('grabber').remove();
 		}
 	}
 });
