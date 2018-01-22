@@ -91,7 +91,10 @@ AFRAME.registerComponent('grabbable', {
 
 		function assignGrabHand(snapshot)
 		{
+			if(!snapshot.val()) return;
+			
 			let hand = document.getElementById(snapshot.val());
+			console.log(snapshot.val(), hand);
 			self.pickup({detail: hand});
 			self.sync.dataRef.child('spawnClient').remove();
 			self.sync.dataRef.child('grabber').remove();

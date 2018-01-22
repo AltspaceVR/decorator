@@ -2118,7 +2118,7 @@ AFRAME.registerComponent('library-item', {
 		this.el.parentElement.addEventListener('pageupdateend', this.updateContents.bind(this));
 		this.el.addEventListener('materialtextureloaded', this.updateDimensions.bind(this));
 
-		this.el.addEventListener('click', this.previewModel.bind(this));
+		this.el.addEventListener('click', this.previewItem.bind(this));
 	},
 	showLoading: function showLoading() {
 		this.el.setAttribute('color', '#555');
@@ -2141,12 +2141,12 @@ AFRAME.registerComponent('library-item', {
 		if (this.itemData) this.el.setAttribute('color', '#fff');
 	},
 
-	previewModel: function previewModel() {
+	previewItem: function previewItem() {
 		var spawn = document.querySelector('#spawn');
 		var gltfUrls = this.itemData.formats.filter(function (x) {
 			return x.formatType === 'GLTF2';
 		});
-		spawn.setAttribute('src', gltfUrls[0].root.url);
+		var polyId = spawn.components.spawner.setSpawn('model-gltf', gltfUrls[0].root.url, 'https://poly.google.com/view/' + this.itemData.name.slice(7));
 	}
 });
 
@@ -2678,6 +2678,12 @@ function arrayDeepEquals(a, b) {
 	});
 }
 
+function objFromKeys(src, keys) {
+	return keys.reduce(function (dest, k) {
+		dest[k] = src[k];return dest;
+	}, {});
+}
+
 AFRAME.registerSystem('poly-service', {
 	schema: {
 		key: { type: 'string' }
@@ -2997,7 +3003,9 @@ AFRAME.registerComponent('altspace-controls', {
 });
 
 var mat = new AFRAME.THREE.Matrix4();
+
 AFRAME.registerComponent('grabbable', {
+	dependencies: ['sync'],
 	schema: {
 		enabled: { default: true }
 	},
@@ -3011,21 +3019,8 @@ AFRAME.registerComponent('grabbable', {
 		this._drop = this.drop.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 
-		// set initial transform and grabber from data attributes
-		if (this.el.dataset.spawnedby && this.el.dataset.spawnedto) {
-			var spawner = document.getElementById(this.el.dataset.spawnedby);
-			var target = document.getElementById(this.el.dataset.spawnedto);
-
-			spawner.object3D.updateMatrixWorld(true);
-			this.el.object3D.updateMatrixWorld(true);
-			mat.getInverse(this.el.object3D.matrixWorld).multiply(spawner.object3D.matrixWorld);
-			setLocalTransform(this.el, mat);
-
-			this.pickup({ detail: target });
-
-			this.el.removeAttribute('data-spawnedby');
-			this.el.removeAttribute('data-spawnedto');
-		}
+		this.sync = this.el.components.sync;
+		if (this.sync.isConnected) this.spawnPickup();else this.el.addEventListener('connected', this.spawnPickup.bind(this));
 	},
 	update: function update() {
 		if (this.data.enabled) {
@@ -3071,6 +3066,27 @@ AFRAME.registerComponent('grabbable', {
 		if (this.grabber) {
 			this.grabber.object3D.updateMatrixWorld(true);
 			setLocalTransform(this.el, mat.getInverse(this.el.object3D.parent.matrixWorld).multiply(this.grabber.object3D.matrixWorld).multiply(this.localTransform));
+		}
+	},
+	spawnPickup: function spawnPickup() {
+		var self = this,
+		    syncSys = this.el.sceneEl.systems['sync-system'];
+
+		self.sync.dataRef.child('spawnClient').on('value', checkSpawnClient);
+		function checkSpawnClient(snapshot) {
+			if (snapshot.val() === syncSys.clientId) {
+				self.sync.dataRef.child('grabber').on('value', assignGrabHand);
+			}
+		}
+
+		function assignGrabHand(snapshot) {
+			if (!snapshot.val()) return;
+
+			var hand = document.getElementById(snapshot.val());
+			console.log(snapshot.val(), hand);
+			self.pickup({ detail: hand });
+			self.sync.dataRef.child('spawnClient').remove();
+			self.sync.dataRef.child('grabber').remove();
 		}
 	}
 });
@@ -3836,15 +3852,23 @@ AFRAME.registerSystem('collision', {
 				for (var _iterator = _getIterator(newHits), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
 					var _manifold = _step.value;
 
+					console.log('new hit!');
 					var co1 = _manifold.getBody0(),
 					    co2 = _manifold.getBody1();
 					var el1 = this.el2co.getA(co1),
 					    el2 = this.el2co.getA(co2);
 					if (!el1 || !el2) continue;
 
+					console.log('valid hit');
 					var el1targets = el1.getAttribute('collision').with,
 					    el2targets = el2.getAttribute('collision').with;
+					console.log(el1targets.map(function (x) {
+						return x.id;
+					}), el2targets.map(function (x) {
+						return x.id;
+					}));
 					if (el1targets.includes(el2) && el2targets.includes(el1)) {
+						console.log('collision-start', el1.id, el2.id);
 						el2.emit('collision-start', el1, false);
 						el1.emit('collision-start', el2, false);
 					}
@@ -3887,6 +3911,7 @@ AFRAME.registerSystem('collision', {
 					var _el1targets = [].concat(_toConsumableArray(_el.getAttribute('collision').with)),
 					    _el2targets = [].concat(_toConsumableArray(_el2.getAttribute('collision').with));
 					if (_el1targets.includes(_el2) && _el2targets.includes(_el)) {
+						console.log('hit end');
 						_el2.emit('collision-end', _el, false);
 						_el.emit('collision-end', _el2, false);
 					}
@@ -3906,7 +3931,7 @@ AFRAME.registerSystem('collision', {
 				}
 			}
 		} catch (e) {
-			console.error('coll-start failed:', e);
+			console.error('coll-end failed:', e);
 		}
 
 		// remember last frame's collisions
@@ -3962,21 +3987,14 @@ AFRAME.registerSystem('collision', {
 
 AFRAME.registerComponent('collision', {
 	schema: {
-		with: {
-			default: [],
-			parse: function parse(value) {
-				if (!value) {
-					return null;
-				}
-				if (typeof value !== 'string') {
-					return value;
-				}
-
-				var sel = value.split(',').map(function (x) {
-					return x + '[collision]';
-				}).join(',');
-				return Array.prototype.slice.call(document.querySelectorAll(sel), 0);
-			}
+		with: { type: 'selectorAll'
+			/*default: [],
+   parse: function(value){
+   	if (!value) { return null; }
+   	if (typeof value !== 'string') { return value; }
+   			let sel = value.split(',').map(x => `${x}[collision]`).join(',');
+   	return Array.prototype.slice.call(document.querySelectorAll(sel), 0);
+   }*/
 		},
 		kinematic: { type: 'boolean', default: false }
 	},
@@ -3997,7 +4015,8 @@ AFRAME.registerComponent('collision', {
 				for (var _iterator3 = _getIterator(this.data.with), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
 					var el = _step3.value;
 
-					if (el !== this.el && el.components.collision) {
+					if (el !== this.el && el.components && el.components.collision) {
+						console.log('updating collider of', el.id);
 						el.components.collision.updateProperties();
 					}
 				}
@@ -4049,12 +4068,18 @@ AFRAME.registerComponent('grab-indicator', {
 AFRAME.registerComponent('spawner', {
 	schema: {
 		enabled: { default: true },
-		spawnTarget: { type: 'selector', default: '#decorations' }
+		spawnTarget: { type: 'selector', default: '#decor' }
 	},
 	init: function init() {
 		this._hoverStart = this.hoverStart.bind(this);
 		this._hoverEnd = this.hoverEnd.bind(this);
 		this.handlers = new _Map();
+
+		this.syncSys = this.el.sceneEl.systems['sync-system'];
+		this.activeItem = null;
+		if (this.el.sceneEl.hasAttribute('debug')) {
+			this.setSpawn('model-gltf', 'https://poly.googleapis.com/downloads/428MKgODp0H/aDT46ikQ6r4/Seal_01.gltf', 'https://poly.google.com/view/428MKgODp0H');
+		}
 	},
 	update: function update() {
 		if (this.data.enabled) {
@@ -4106,17 +4131,69 @@ AFRAME.registerComponent('spawner', {
 		var _this = this;
 
 		return function () {
-
 			// create new model
-			var child = document.createElement('a-entity');
-			child.classList.add('decoration');
-			child.setAttribute('mixin', 'model');
-			child.setAttribute('data-src', _this.el.getAttribute('gltf-model'));
-			child.setAttribute('data-spawnedby', _this.el.id);
-			child.setAttribute('data-spawnedto', target.id);
-			child.setAttribute('grabbable', { enabled: true });
-			child.setAttribute('collision', { with: '#lefthand,#righthand' });
-			_this.data.spawnTarget.appendChild(child);
+			/*let child = document.createElement('a-entity');
+   child.id = key;
+   child.setAttribute('mixin', 'decoration');
+   child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
+   child.setAttribute('data-spawnedby', this.el.id);
+   child.setAttribute('data-spawnedto', target.id);
+   this.data.spawnTarget.appendChild(child);*/
+
+			/*this.data.spawnTarget.components['decor-sync'].instantiate(
+   	this.activeItem.type,
+   	this.activeItem.srcUrl,
+   	this.activeItem.moreInfoUrl
+   );*/
+
+			if (!_this.syncSys.isConnected) {
+				console.error('Spawner: sync system not yet connected, cannot spawn.');
+				return;
+			}
+
+			/*
+   This is copy-pasted from the source code for sync-system#instantiate with minor changes
+   */
+			var instantiationProps = {
+				instantiatorId: '',
+				groupName: 'main',
+				mixin: 'decoration',
+				parent: _this.attrValue.spawnTarget || '#decor',
+				creatorUserId: _this.syncSys.userInfo.userId,
+				clientId: _this.syncSys.clientId
+			};
+
+			var instance = _this.syncSys.instantiatedElementsRef.child(instantiationProps.groupName).push(instantiationProps);
+
+			var entityRef = _this.syncSys.sceneRef.child('main-instance-' + instance.key()),
+			    dataRef = entityRef.child('data');
+
+			// compute new local transform matrix
+			_this.data.spawnTarget.object3D.updateMatrixWorld(true);
+			_this.el.object3D.updateMatrixWorld(true);
+			var mat = new AFRAME.THREE.Matrix4().getInverse(_this.data.spawnTarget.object3D.matrixWorld).multiply(_this.el.object3D.matrixWorld);
+
+			// extract to transform data
+			var pos = new AFRAME.THREE.Vector3(),
+			    quat = new AFRAME.THREE.Quaternion(),
+			    rot = new AFRAME.THREE.Euler(),
+			    scale = new AFRAME.THREE.Vector3();
+			mat.decompose(pos, quat, scale);
+			rot = rot.setFromQuaternion(quat).toVector3().multiplyScalar(180 / Math.PI);
+
+			// set sync initial position
+			dataRef.child('position').set(objFromKeys(pos, ['x', 'y', 'z']));
+			dataRef.child('rotation').set(objFromKeys(rot, ['x', 'y', 'z']));
+			dataRef.child('scale').set(objFromKeys(scale, ['x', 'y', 'z']));
+
+			// assign model properties
+			dataRef.child('type').set(_this.activeItem.type);
+			dataRef.child('srcUrl').set(_this.activeItem.srcUrl);
+			dataRef.child('moreInfoUrl').set(_this.activeItem.moreInfoUrl);
+
+			// assign grab properties
+			dataRef.child('spawnClient').set(_this.syncSys.clientId);
+			dataRef.child('grabber').set(target.id);
 
 			// disable this spawner until the hand clears the collider
 			_this.el.setAttribute('spawner', 'enabled', false);
@@ -4128,6 +4205,10 @@ AFRAME.registerComponent('spawner', {
 		target.removeEventListener('gripdown', this.handlers.get(target));
 		this.handlers.delete(target);
 		this.el.setAttribute('spawner', 'enabled', true);
+	},
+	setSpawn: function setSpawn(type, srcUrl, moreInfoUrl) {
+		this.activeItem = { type: type, srcUrl: srcUrl, moreInfoUrl: moreInfoUrl };
+		if (type === 'model-gltf') this.el.setAttribute('gltf-model', srcUrl);
 	}
 });
 
@@ -4150,6 +4231,198 @@ AFRAME.registerComponent('quaternion', {
 		//this.el.object3D.quaternion.copy(this.data);
 		var e = new AFRAME.THREE.Euler().setFromQuaternion(this.data, 'YZX').toVector3().multiplyScalar(180 / Math.PI);
 		this.el.setAttribute('rotation', e);
+	}
+});
+
+AFRAME.registerComponent('decor-sync', {
+	init: function init() {
+		this.queuedInstantiations = [];
+		this.syncSys = this.el.sceneEl.systems['sync-system'];
+		this.el.sceneEl.addEventListener('connected', this.connected.bind(this));
+	},
+	connected: function connected() {
+		this.instances = this.syncSys.connection.space.child('decorations');
+		this.instances.on('child_added', this.listenToInstanceGroup.bind(this));
+		this.instances.on('child_removed', this.stopListeningToInstanceGroup.bind(this));
+	},
+	listenToInstanceGroup: function listenToInstanceGroup(snapshot) {
+		snapshot.ref().on('child_added', this.createDecoration.bind(this));
+		snapshot.ref().on('child_removed', this.removeDecoration.bind(this));
+	},
+	stopListeningToInstanceGroup: function stopListeningToInstanceGroup(snapshot) {
+		snapshot.ref().off('child_added');
+		snapshot.ref().off('child_removed');
+	},
+	createDecoration: function createDecoration(snapshot) {
+		var val = snapshot.val(),
+		    key = snapshot.key();
+
+		// create new model
+		/*let child = document.createElement('a-entity');
+  child.id = key;
+  child.setAttribute('mixin', 'decoration');
+  child.setAttribute('data-src', this.el.getAttribute('gltf-model'));
+  child.setAttribute('data-spawnedby', this.el.id);
+  child.setAttribute('data-spawnedto', target.id);
+  this.el.appendChild(child);*/
+	},
+	removeDecoration: function removeDecoration(snapshot) {
+		var key = snapshot.key();
+		var el = this.el.querySelector('#' + key);
+		el.parentNode.removeChild(el);
+	},
+	processQueuedInstantiations: function processQueuedInstantiations() {
+		var _this = this;
+
+		this.queuedInstantiations.forEach(function (instanceProps) {
+			_this.instances.push(instanceProps).onDisconnect().remove();
+		});
+		this.queuedInstantiations.length = 0;
+	},
+	instantiate: function instantiate(type, srcUrl) {
+		/*
+  General: ownerId, clientId
+  Specific: type, srcUrl
+  */
+		var instanceProps = {};
+
+		this.queuedInstantiations.push(instanceProps);
+		if (this.syncSys.connected) {
+			this.processQueuedInstantiations();
+		}
+	}
+});
+
+/**
+ * Returns a function, that, as long as it continues to be invoked, will not
+ * be triggered. The function will be called after it stops being called for
+ * N milliseconds. If `immediate` is passed, trigger the function on the
+ * leading edge, instead of the trailing. The function also has a property 'clear' 
+ * that is a function which will clear the timer to prevent previously scheduled executions. 
+ *
+ * @source underscore.js
+ * @see http://unscriptable.com/2009/03/20/debouncing-javascript-methods/
+ * @param {Function} function to wrap
+ * @param {Number} timeout in ms (`100`)
+ * @param {Boolean} whether to execute at the beginning (`false`)
+ * @api public
+ */
+
+var debounce = function debounce(func, wait, immediate){
+  var timeout, args, context, timestamp, result;
+  if (null == wait) wait = 100;
+
+  function later() {
+    var last = Date.now() - timestamp;
+
+    if (last < wait && last >= 0) {
+      timeout = setTimeout(later, wait - last);
+    } else {
+      timeout = null;
+      if (!immediate) {
+        result = func.apply(context, args);
+        context = args = null;
+      }
+    }
+  }
+
+  var debounced = function(){
+    context = this;
+    args = arguments;
+    timestamp = Date.now();
+    var callNow = immediate && !timeout;
+    if (!timeout) timeout = setTimeout(later, wait);
+    if (callNow) {
+      result = func.apply(context, args);
+      context = args = null;
+    }
+
+    return result;
+  };
+
+  debounced.clear = function() {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+  
+  debounced.flush = function() {
+    if (timeout) {
+      result = func.apply(context, args);
+      context = args = null;
+      
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+
+  return debounced;
+};
+
+AFRAME.registerComponent('sync-src', {
+	dependencies: ['sync'],
+	init: function init() {
+		var _this = this;
+
+		this.currentData = { type: '', srcUrl: '', moreInfoUrl: '' };
+		this.sync = this.el.components.sync;
+
+		this.el.addEventListener('click', function () {
+			if (_this.currentData.moreInfoUrl) altspace.open(_this.currentData.moreInfoUrl);
+		});
+
+		if (this.sync.isConnected) this.init2();else this.el.addEventListener('connected', this.init2.bind(this));
+	},
+	init2: function init2() {
+		var _this2 = this;
+
+		var applyData = debounce(function () {
+			if (_this2.currentData.type === 'model-gltf') {
+				// TODO: remove other types
+				_this2.el.setAttribute('gltf-model', _this2.currentData.srcUrl);
+			}
+		}, 150);
+
+		var typeRef = this.sync.dataRef.child('type'),
+		    srcRef = this.sync.dataRef.child('srcUrl'),
+		    moreInfoRef = this.sync.dataRef.child('moreInfoUrl');
+
+		typeRef.on('value', function (snapshot) {
+			if (!_this2.currentData.type) {
+				_this2.currentData.type = snapshot.val();
+				applyData();
+			}
+		});
+
+		srcRef.on('value', function (snapshot) {
+			if (!_this2.currentData.srcUrl) {
+				_this2.currentData.srcUrl = snapshot.val();
+				applyData();
+			}
+		});
+
+		moreInfoRef.on('value', function (snapshot) {
+			if (!_this2.currentData.moreInfoUrl) {
+				_this2.currentData.moreInfoUrl = snapshot.val();
+			}
+		});
+	}
+});
+
+AFRAME.registerComponent('if-mod', {
+	schema: { type: 'string', default: '' },
+	init: function init() {
+		var syncSys = this.el.sceneEl.systems['sync-system'];
+		var evaluateModStatus = function () {
+			if (syncSys.userInfo.isModerator) this.el.setAttribute('mixin', this.data + ' ' + this.el.getAttribute('mixin'));
+		}.bind(this);
+
+		if (syncSys.isConnected) {
+			evaluateModStatus();
+		} else {
+			this.el.sceneEl.addEventListener('connected', evaluateModStatus);
+		}
 	}
 });
 
