@@ -34,8 +34,8 @@ html
 				a-mixin#parlor_spot(position='8 2 8.8', rotation='0 -90 0')
 
 			-
-				var pfs = 'templates: highrise_homespace,exhibition-homespace,conference-homespace,lodge-homespace,parlor-homespace; '
-					+ 'mixins: highrise_spot,exhibition_spot,conference_spot,lodge_spot,parlor_spot;'
+				var pfs = 'templates: highrise_homespace,exhibition-homespace,exhibition-base,conference-homespace,lodge-homespace,parlor-homespace; '
+					+ 'mixins: highrise_spot,exhibition_spot,exhibition_spot,conference_spot,lodge_spot,parlor_spot;'
 			a-entity#spawn-complex(place-for-space=pfs)
 
 				a-entity#spawn_point(position='1 .55 0')
